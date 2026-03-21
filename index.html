@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f8fafc">
+    <link rel="apple-touch-icon" href="data:,">
+    <title>Çakallı Köyevi ve Bahçe Projesi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
+        .card { background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; z-index: 100; transition: opacity 0.5s; }
+        .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        /* Mobile transaction cards */
+        @media (max-width: 767px) {
+            .desktop-table { display: none !important; }
+            .mobile-cards { display: block !important; }
+            .mobile-btn-grid { display: grid !important; grid-template-columns: 1fr 1fr; gap: 0.5rem; width: 100%; }
+            .mobile-btn-grid .btn-full { grid-column: 1 / -1; }
+        }
+        @media (min-width: 768px) {
+            .mobile-cards { display: none !important; }
+        }
+        /* iOS safe area */
+        body { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div id="loader" class="loading-overlay">
+        <div class="text-center">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent"></div>
+            <p class="mt-2 text-slate-600 font-medium">Veriler Yükleniyor...</p>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">Çakallı Köyevi ve Bahçe Projesi Bütçe Paneli</h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <p class="text-slate-500 text-sm font-medium">Yerel Veri Depolama Aktif</p>
+                </div>
+            </div>
+            <div class="flex gap-2 flex-wrap md:flex-nowrap mobile-btn-grid">
+                <button onclick="openCategoryModal()" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-2.5 rounded-lg font-semibold transition border border-indigo-200 shadow-sm flex items-center justify-center gap-1 text-sm btn-full">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Kategoriler
+                </button>
+                <button onclick="openModal('expense')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2.5 rounded-lg font-semibold transition shadow-lg shadow-emerald-200 text-sm flex items-center justify-center">
+                    + Harcama Ekle
+                </button>
+                <button onclick="openModal('transfer')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2.5 rounded-lg font-semibold transition shadow-lg shadow-blue-200 text-sm flex items-center justify-center">
+                    + Nakit Transfer/Katkı
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
+            <div class="card p-4 md:p-6 border-l-4 border-emerald-500">
+                <p class="text-[11px] md:text-sm text-slate-500 font-medium mb-1">Toplam Proje Maliyeti</p>
+                <h2 id="total-spent" class="text-lg md:text-2xl font-bold text-slate-800">0.00 ₺</h2>
+            </div>
+            <div class="card p-4 md:p-6 border-l-4 border-blue-500">
+                <p class="text-[11px] md:text-sm text-slate-500 font-medium mb-1">Kasadaki Mevcut Para</p>
+                <h2 id="vault-balance" class="text-lg md:text-2xl font-bold text-slate-800">0.00 ₺</h2>
+            </div>
+            <div id="settlement-card" class="card p-4 md:p-6 border-l-4 border-amber-500 col-span-2 md:col-span-2">
+                <p class="text-[11px] md:text-sm text-slate-500 font-medium mb-1">Dengeleme Durumu (50/50 Paylaşım)</p>
+                <h2 id="settlement-status" class="text-sm md:text-xl font-bold text-slate-800 italic mt-1">Veriler Bekleniyor...</h2>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+            <div class="lg:col-span-2">
+                <div class="card overflow-hidden">
+                    <div class="p-4 md:p-5 border-b bg-slate-50 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800 text-sm md:text-base">İşlem Geçmişi</h3>
+                    </div>
+                    <!-- Desktop Table -->
+                    <div class="overflow-x-auto custom-scrollbar desktop-table">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50 text-slate-500 text-[11px] uppercase font-bold tracking-wider">
+                                <tr>
+                                    <th class="px-6 py-4">Tarih</th>
+                                    <th class="px-6 py-4">Açıklama</th>
+                                    <th class="px-6 py-4">Kişi</th>
+                                    <th class="px-6 py-4 text-right">Tutar</th>
+                                    <th class="px-4 py-4 text-center">İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transaction-history" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                    <!-- Mobile Cards -->
+                    <div id="transaction-cards" class="mobile-cards divide-y divide-slate-100" style="display:none;"></div>
+                </div>
+            </div>
+
+            <div class="space-y-8">
+                <div class="card p-6">
+                    <h3 class="font-bold text-slate-800 mb-6">Harcama Dağılımı</h3>
+                    <div id="category-breakdown" class="space-y-5"></div>
+                </div>
+                <div class="card p-6">
+                    <h3 class="font-bold text-slate-800 mb-6">Ortak Net Katkı Oranları</h3>
+                    <div class="space-y-5" id="partner-stats"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Management Modal -->
+    <div id="category-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <h3 class="text-xl font-bold mb-4 text-slate-800">Kategorileri Yönet</h3>
+            <div class="mb-5 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                <div class="flex gap-2">
+                    <input type="text" id="new-category-name" class="flex-1 p-2.5 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition shadow-inner" placeholder="Yeni Kategori Adı" onkeypress="if(event.key === 'Enter') addCategory()">
+                    <button type="button" onclick="addCategory()" class="bg-indigo-600 text-white px-5 rounded-lg font-semibold hover:bg-indigo-700 transition shadow-md">Ekle</button>
+                </div>
+            </div>
+            <div class="h-[250px] overflow-y-auto custom-scrollbar pr-2 rounded-lg border border-slate-100 bg-white" id="category-list"></div>
+            <div class="mt-6 flex justify-end">
+                <button type="button" onclick="closeCategoryModal()" class="px-5 py-2.5 border border-slate-300 text-slate-700 bg-slate-50 rounded-lg hover:bg-slate-100 transition font-medium">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Transaction Modal -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <h3 id="modal-title" class="text-xl font-bold mb-6 text-slate-800 tracking-tight">İşlem Ekle</h3>
+            <form id="transaction-form" onsubmit="handleFormSubmit(event)">
+                <input type="hidden" id="form-type">
+                <input type="hidden" id="form-tx-id">
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">İşlemi Yapan Kişi</label>
+                        <select id="form-user" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition" required>
+                            <option value="Egemen">Egemen</option>
+                            <option value="Mesut">Mesut</option>
+                        </select>
+                    </div>
+                    <div id="category-group">
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Kategori</label>
+                        <select id="form-category" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition"></select>
+                    </div>
+                    <div id="source-group">
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Ödeme Kaynağı</label>
+                        <select id="form-source" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition">
+                            <option value="personal">Kendi Cebinden</option>
+                            <option value="vault">Ortak Kasadan</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Açıklama</label>
+                        <input type="text" id="form-desc" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition" placeholder="Örn: 20 Torba Çimento" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Tutar (₺)</label>
+                        <input type="number" step="0.01" id="form-amount" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition font-mono" required>
+                    </div>
+                </div>
+                <div class="mt-8 flex gap-3">
+                    <button type="button" onclick="closeModal()" class="flex-1 px-4 py-3 border border-slate-300 text-slate-700 bg-slate-50 rounded-xl hover:bg-slate-100 transition font-semibold">Vazgeç</button>
+                    <button type="submit" id="submit-btn" class="flex-1 px-4 py-3 bg-slate-800 text-white rounded-xl hover:bg-slate-900 transition font-semibold shadow-md">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        var transactions = [];
+        var categories = [];
+        var defaultCategories = [
+            "Arsa/Gayrimenkul",
+            "İnşaat/Toprak",
+            "Fidan/Ağaç",
+            "Ekipman/Hortum",
+            "İşçilik",
+            "İnşaat Malzemesi",
+            "Elektrik/Aydınlatma",
+            "Su/Tesisat",
+            "Çit/Çevre Düzenleme",
+            "Nakliye/Taşıma",
+            "Mimari/Proje",
+            "Resmi Giderler/Harç",
+            "Mobilya/Dekorasyon",
+            "Güvenlik/Kamera",
+            "Bahçe Bakım",
+            "Yakıt/Enerji",
+            "Diğer"
+        ];
+
+        var defaultData = [
+            { id: 10, date: '2025-11-20', desc: '1800 M2 BAHÇE ALIŞ FİYATI (EGEMEN PAYI)', amount: 900000, type: 'expense', category: 'Arsa/Gayrimenkul', user: 'Egemen', source: 'personal', createdAt: 0 },
+            { id: 11, date: '2025-11-20', desc: '1800 M2 BAHÇE ALIŞ FİYATI (MESUT PAYI)', amount: 900000, type: 'expense', category: 'Arsa/Gayrimenkul', user: 'Mesut', source: 'personal', createdAt: 0 },
+            { id: 1, date: '2026-03-05', desc: 'TOPRAK DÜZELTME İŞLERİ', amount: 15400, type: 'expense', category: 'İnşaat/Toprak', user: 'Egemen', source: 'personal', createdAt: 1 },
+            { id: 2, date: '2026-03-06', desc: 'MESUTTAN EGEMENE ÖDEME', amount: 7700, type: 'transfer', category: 'Nakit Ödeme', user: 'Mesut', source: 'personal', createdAt: 2 },
+            { id: 3, date: '2026-03-13', desc: 'AĞAÇLAR', amount: 3400, type: 'expense', category: 'Fidan/Ağaç', user: 'Mesut', source: 'personal', createdAt: 3 },
+            { id: 4, date: '2026-03-13', desc: 'HORTUM', amount: 800, type: 'expense', category: 'Ekipman/Hortum', user: 'Mesut', source: 'personal', createdAt: 4 },
+            { id: 5, date: '2026-03-13', desc: 'FİDAN', amount: 10000, type: 'expense', category: 'Fidan/Ağaç', user: 'Egemen', source: 'personal', createdAt: 5 },
+            { id: 6, date: '2026-03-13', desc: 'İŞÇİLİK', amount: 7000, type: 'expense', category: 'İşçilik', user: 'Egemen', source: 'personal', createdAt: 6 },
+            { id: 7, date: '2026-03-16', desc: '2. FASIL FİDAN', amount: 7000, type: 'expense', category: 'Fidan/Ağaç', user: 'Egemen', source: 'personal', createdAt: 7 },
+            { id: 8, date: '2026-03-16', desc: '2. FASIL İŞÇİLİK', amount: 7000, type: 'expense', category: 'İşçilik', user: 'Egemen', source: 'personal', createdAt: 8 },
+            { id: 9, date: '2026-03-25', desc: 'MESUT NAKİT ÖDEME', amount: 13400, type: 'transfer', category: 'Nakit Ödeme', user: 'Mesut', source: 'personal', createdAt: 9 }
+        ];
+
+        function initApp() {
+            var savedCats = localStorage.getItem('garden_categories_v3');
+            if (savedCats) {
+                categories = JSON.parse(savedCats);
+            } else {
+                categories = defaultCategories.slice();
+                saveCategories();
+            }
+
+            var saved = localStorage.getItem('garden_transactions_v3');
+            if (saved) {
+                transactions = JSON.parse(saved);
+            } else {
+                transactions = defaultData.slice();
+                saveData();
+            }
+            
+            transactions.sort(function(a,b) { return new Date(b.date) - new Date(a.date); });
+            updateUI();
+            
+            setTimeout(function() {
+                document.getElementById('loader').style.opacity = '0';
+                setTimeout(function() { document.getElementById('loader').classList.add('hidden'); }, 500);
+            }, 600);
+        }
+
+        function saveData() {
+            localStorage.setItem('garden_transactions_v3', JSON.stringify(transactions));
+        }
+
+        function saveCategories() {
+            localStorage.setItem('garden_categories_v3', JSON.stringify(categories));
+        }
+
+        /* Category Management */
+        window.openCategoryModal = function() {
+            document.getElementById('category-modal').classList.remove('hidden');
+            renderCategories();
+            setTimeout(function() { document.getElementById('new-category-name').focus(); }, 100);
+        };
+
+        window.closeCategoryModal = function() {
+            document.getElementById('category-modal').classList.add('hidden');
+        };
+
+        window.addCategory = function() {
+            var input = document.getElementById('new-category-name');
+            var val = input.value.trim();
+            if (val && categories.indexOf(val) === -1) {
+                categories.push(val);
+                saveCategories();
+                renderCategories();
+                input.value = '';
+            }
+        };
+
+        window.deleteCategory = function(cat) {
+            if (confirm('"' + cat + '" kategorisini silmek istediğine emin misin?')) {
+                categories = categories.filter(function(c) { return c !== cat; });
+                saveCategories();
+                renderCategories();
+            }
+        };
+
+        window.editCategory = function(oldName) {
+            var newName = prompt('Kategori adını düzenle:', oldName);
+            if (newName && newName.trim() && newName.trim() !== oldName) {
+                newName = newName.trim();
+                if (categories.indexOf(newName) !== -1) {
+                    alert('"' + newName + '" zaten mevcut!');
+                    return;
+                }
+                var idx = categories.indexOf(oldName);
+                if (idx !== -1) categories[idx] = newName;
+                // Update all transactions with old category name
+                for (var i = 0; i < transactions.length; i++) {
+                    if (transactions[i].category === oldName) {
+                        transactions[i].category = newName;
+                    }
+                }
+                saveCategories();
+                saveData();
+                updateUI();
+                renderCategories();
+            }
+        };
+
+        function renderCategories() {
+            var list = document.getElementById('category-list');
+            if (categories.length === 0) {
+                list.innerHTML = '<p class="text-sm text-slate-500 italic p-4 text-center">Kategori bulunamadı.</p>';
+                return;
+            }
+            var html = '';
+            for (var i = 0; i < categories.length; i++) {
+                var c = categories[i];
+                var safeC = c.replace(/'/g, "\\'");
+                html += '<div class="flex justify-between items-center p-3 border-b border-slate-100 hover:bg-slate-50 transition group">' +
+                    '<span class="font-medium text-slate-700 pl-1">' + c + '</span>' +
+                    '<div class="flex items-center gap-1">' +
+                    '<button onclick="editCategory(\'' + safeC + '\')" class="text-slate-300 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition cursor-pointer focus:outline-none" title="Düzenle">' +
+                    '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>' +
+                    '</button>' +
+                    '<button onclick="deleteCategory(\'' + safeC + '\')" class="text-slate-300 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-50 transition cursor-pointer focus:outline-none" title="Sil">' +
+                    '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
+                    '</button>' +
+                    '</div></div>';
+            }
+            list.innerHTML = html;
+        }
+
+        /* Transaction Edit / Delete */
+        window.editTransaction = function(id) {
+            var tx = null;
+            for (var i = 0; i < transactions.length; i++) {
+                if (transactions[i].id === id) { tx = transactions[i]; break; }
+            }
+            if (!tx) return;
+            openModal(tx.type, id);
+        };
+
+        window.deleteTransaction = function(id) {
+            if (confirm("Bu işlemi kalıcı olarak silmek istediğinize emin misiniz?")) {
+                transactions = transactions.filter(function(t) { return t.id !== id; });
+                saveData();
+                updateUI();
+            }
+        };
+
+        /* Form Handling */
+        window.handleFormSubmit = function(e) {
+            e.preventDefault();
+            var btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            btn.innerText = 'Kaydediliyor...';
+
+            var editId = document.getElementById('form-tx-id').value;
+            var type = document.getElementById('form-type').value;
+            var user = document.getElementById('form-user').value;
+            var amount = parseFloat(document.getElementById('form-amount').value);
+            var desc = document.getElementById('form-desc').value;
+            var category = document.getElementById('form-category').value;
+            var source = document.getElementById('form-source').value;
+
+            if (editId) {
+                for (var i = 0; i < transactions.length; i++) {
+                    if (transactions[i].id == editId) {
+                        transactions[i].type = type;
+                        transactions[i].user = user;
+                        transactions[i].amount = amount;
+                        transactions[i].desc = desc;
+                        transactions[i].category = type === 'expense' ? category : 'Nakit Ödeme';
+                        transactions[i].source = type === 'expense' ? source : 'personal';
+                        break;
+                    }
+                }
+            } else {
+                var newTx = {
+                    id: Date.now(),
+                    date: new Date().toISOString().split('T')[0],
+                    type: type,
+                    user: user,
+                    amount: amount,
+                    desc: desc,
+                    category: type === 'expense' ? category : 'Nakit Ödeme',
+                    source: type === 'expense' ? source : 'personal',
+                    createdAt: Date.now()
+                };
+                transactions.push(newTx);
+            }
+
+            transactions.sort(function(a,b) { return new Date(b.date) - new Date(a.date); });
+            saveData();
+            updateUI();
+            closeModal();
+
+            btn.disabled = false;
+            btn.innerText = 'Kaydet';
+        };
+
+        function updateUI() {
+            var list = document.getElementById('transaction-history');
+            var mobileList = document.getElementById('transaction-cards');
+            list.innerHTML = '';
+            mobileList.innerHTML = '';
+
+            var totalSpent = 0;
+            var vaultBalance = 0;
+            var egemenOutPocket = 0; 
+            var mesutOutPocket = 0; 
+            var catTotals = {};
+
+            if (transactions.length === 0) {
+                list.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400 italic">Henüz hiç işlem bulunmuyor.</td></tr>';
+                mobileList.innerHTML = '<div class="p-6 text-center text-slate-400 italic text-sm">Henüz hiç işlem bulunmuyor.</div>';
+            }
+
+            for (var i = 0; i < transactions.length; i++) {
+                var tx = transactions[i];
+                var isExpense = tx.type === 'expense';
+                var userBadge = tx.user === 'Egemen' ? 'bg-indigo-100 text-indigo-700' : 'bg-purple-100 text-purple-700';
+                var vaultBadge = tx.source === 'vault' ? '<span class="ml-1 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold shadow-sm">KASA</span>' : '';
+                var amountColor = isExpense ? 'text-slate-700' : 'text-emerald-600';
+                var amountPrefix = isExpense ? '-' : '+';
+
+                // Desktop table row
+                var row = document.createElement('tr');
+                row.className = "hover:bg-slate-50 transition-colors group";
+                row.innerHTML = '<td class="px-6 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap">' + tx.date + '</td>' +
+                    '<td class="px-6 py-4">' +
+                        '<div class="font-bold text-slate-800 text-[13px] uppercase">' + tx.desc + '</div>' +
+                        '<div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">' + tx.category + '</div>' +
+                    '</td>' +
+                    '<td class="px-6 py-4 text-sm">' +
+                        '<span class="px-2.5 py-1.5 rounded-lg text-[10px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' +
+                        vaultBadge +
+                    '</td>' +
+                    '<td class="px-6 py-4 text-sm font-bold text-right ' + amountColor + '">' +
+                        amountPrefix + tx.amount.toLocaleString('tr-TR') + ' ₺' +
+                    '</td>' +
+                    '<td class="px-4 py-4 text-center whitespace-nowrap">' +
+                        '<div class="flex justify-center items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">' +
+                            '<button onclick="editTransaction(' + tx.id + ')" class="text-indigo-500 hover:text-indigo-700 p-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition" title="Düzenle">' +
+                                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>' +
+                            '</button>' +
+                            '<button onclick="deleteTransaction(' + tx.id + ')" class="text-rose-500 hover:text-rose-700 p-1.5 bg-rose-50 hover:bg-rose-100 rounded-lg transition" title="Sil">' +
+                                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
+                            '</button>' +
+                        '</div>' +
+                    '</td>';
+                list.appendChild(row);
+
+                // Mobile card
+                var card = document.createElement('div');
+                card.className = 'p-4 hover:bg-slate-50 transition-colors';
+                card.innerHTML = '<div class="flex justify-between items-start mb-2">' +
+                        '<div class="flex-1 min-w-0 pr-3">' +
+                            '<div class="font-bold text-slate-800 text-[13px] uppercase truncate">' + tx.desc + '</div>' +
+                            '<div class="flex items-center gap-2 mt-1.5 flex-wrap">' +
+                                '<span class="text-[10px] text-slate-400 font-semibold">' + tx.date + '</span>' +
+                                '<span class="px-2 py-0.5 rounded text-[9px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' +
+                                vaultBadge +
+                                '<span class="text-[9px] text-slate-300 uppercase tracking-widest font-bold">' + tx.category + '</span>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div class="text-right shrink-0">' +
+                            '<div class="text-sm font-bold ' + amountColor + '">' + amountPrefix + tx.amount.toLocaleString('tr-TR') + ' ₺</div>' +
+                            '<div class="flex gap-1 mt-1.5 justify-end">' +
+                                '<button onclick="editTransaction(' + tx.id + ')" class="text-indigo-500 p-1.5 bg-indigo-50 rounded-lg active:bg-indigo-100">' +
+                                    '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>' +
+                                '</button>' +
+                                '<button onclick="deleteTransaction(' + tx.id + ')" class="text-rose-500 p-1.5 bg-rose-50 rounded-lg active:bg-rose-100">' +
+                                    '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
+                                '</button>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+                mobileList.appendChild(card);
+
+                if (tx.type === 'expense') {
+                    totalSpent += tx.amount;
+                    if (!catTotals[tx.category]) catTotals[tx.category] = 0;
+                    catTotals[tx.category] += tx.amount;
+                    
+                    if (tx.source === 'vault') {
+                        vaultBalance -= tx.amount;
+                    } else {
+                        if (tx.user === 'Egemen') egemenOutPocket += tx.amount;
+                        else mesutOutPocket += tx.amount;
+                    }
+                } else if (tx.type === 'transfer') {
+                    if (tx.user === 'Egemen') {
+                        egemenOutPocket += tx.amount;
+                        mesutOutPocket -= tx.amount;
+                    } else {
+                        mesutOutPocket += tx.amount;
+                        egemenOutPocket -= tx.amount;
+                    }
+                }
+            }
+
+            document.getElementById('total-spent').innerText = totalSpent.toLocaleString('tr-TR') + ' ₺';
+            document.getElementById('vault-balance').innerText = vaultBalance.toLocaleString('tr-TR') + ' ₺';
+
+            var totalOutPocket = egemenOutPocket + mesutOutPocket;
+            var target = totalOutPocket / 2;
+            var statusEl = document.getElementById('settlement-status');
+            var cardEl = document.getElementById('settlement-card');
+
+            if (egemenOutPocket > target + 1) {
+                statusEl.innerText = "Mesut, Egemen'e " + (egemenOutPocket - target).toLocaleString('tr-TR') + ' ₺ vermeli.';
+                cardEl.className = "card p-6 border-l-4 border-amber-500 col-span-1 md:col-span-2";
+            } else if (mesutOutPocket > target + 1) {
+                statusEl.innerText = "Egemen, Mesut'a " + (mesutOutPocket - target).toLocaleString('tr-TR') + ' ₺ vermeli.';
+                cardEl.className = "card p-6 border-l-4 border-amber-500 col-span-1 md:col-span-2";
+            } else {
+                statusEl.innerText = 'Durum Tamamen Dengeli.';
+                cardEl.className = "card p-6 border-l-4 border-emerald-500 col-span-1 md:col-span-2";
+            }
+
+            // Partner Stats Bars
+            var partnerStats = document.getElementById('partner-stats');
+            var egemenPerc = totalOutPocket > 0 ? (egemenOutPocket / totalOutPocket * 100) : 0;
+            var mesutPerc = totalOutPocket > 0 ? (mesutOutPocket / totalOutPocket * 100) : 0;
+
+            partnerStats.innerHTML = '<div>' +
+                '<div class="flex justify-between text-xs mb-1.5 font-bold">' +
+                    '<span class="text-slate-600">Egemen <span class="text-slate-400 font-normal">(Net Katkı)</span></span>' +
+                    '<span class="text-indigo-600">' + egemenOutPocket.toLocaleString('tr-TR') + ' ₺</span>' +
+                '</div>' +
+                '<div class="w-full bg-slate-100 rounded-full h-3 mb-5 overflow-hidden shadow-inner">' +
+                    '<div class="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + egemenPerc + '%"></div>' +
+                '</div>' +
+                '</div><div>' +
+                '<div class="flex justify-between text-xs mb-1.5 font-bold">' +
+                    '<span class="text-slate-600">Mesut <span class="text-slate-400 font-normal">(Net Katkı)</span></span>' +
+                    '<span class="text-purple-600">' + mesutOutPocket.toLocaleString('tr-TR') + ' ₺</span>' +
+                '</div>' +
+                '<div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">' +
+                    '<div class="bg-purple-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + mesutPerc + '%"></div>' +
+                '</div>' +
+                '</div>';
+
+            // Category Breakdown Bars
+            var breakdownEl = document.getElementById('category-breakdown');
+            var sortedCats = [];
+            for (var catName in catTotals) {
+                if (catTotals[catName] > 0) sortedCats.push([catName, catTotals[catName]]);
+            }
+            sortedCats.sort(function(a, b) { return b[1] - a[1]; });
+
+            if (sortedCats.length === 0) {
+                breakdownEl.innerHTML = '<p class="text-sm text-slate-400 italic text-center py-4">Henüz harcama bulunmuyor.</p>';
+            } else {
+                var maxAmt = sortedCats[0][1];
+                var barColors = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500', 'bg-teal-500', 'bg-purple-500', 'bg-orange-500'];
+                var textColors = ['text-blue-600', 'text-emerald-600', 'text-amber-600', 'text-rose-600', 'text-indigo-600', 'text-teal-600', 'text-purple-600', 'text-orange-600'];
+                var barsHtml = '';
+                for (var j = 0; j < sortedCats.length; j++) {
+                    var cat = sortedCats[j][0];
+                    var amt = sortedCats[j][1];
+                    var perc = totalSpent > 0 ? Math.round((amt / totalSpent) * 100) : 0;
+                    var relPerc = maxAmt > 0 ? (amt / maxAmt) * 100 : 0;
+                    var colorClass = barColors[j % barColors.length];
+                    var textColor = textColors[j % textColors.length];
+                    var safeCat = cat.replace(/'/g, "\\'");
+                    
+                    // Get transactions for this category
+                    var catTxs = [];
+                    for (var k = 0; k < transactions.length; k++) {
+                        if (transactions[k].type === 'expense' && transactions[k].category === cat) {
+                            catTxs.push(transactions[k]);
+                        }
+                    }
+                    
+                    // Build detail rows
+                    var detailHtml = '';
+                    for (var m = 0; m < catTxs.length; m++) {
+                        var t = catTxs[m];
+                        var userColor = t.user === 'Egemen' ? 'text-indigo-600' : 'text-purple-600';
+                        detailHtml += '<div class="flex justify-between items-center py-2 px-3 border-b border-slate-100 last:border-0">' +
+                            '<div class="flex-1 min-w-0">' +
+                                '<div class="text-xs font-semibold text-slate-700 truncate">' + t.desc + '</div>' +
+                                '<div class="text-[10px] text-slate-400 mt-0.5">' + t.date + ' · <span class="' + userColor + ' font-bold">' + t.user + '</span></div>' +
+                            '</div>' +
+                            '<span class="text-xs font-bold text-slate-600 ml-3 whitespace-nowrap">' + t.amount.toLocaleString('tr-TR') + ' ₺</span>' +
+                        '</div>';
+                    }
+                    
+                    barsHtml += '<div>' +
+                        '<div class="cursor-pointer select-none" onclick="toggleCatDetail(\'' + safeCat + '\')">' +
+                            '<div class="flex justify-between items-end mb-1.5">' +
+                                '<span class="text-sm font-bold text-slate-700 flex items-center gap-1">' +
+                                    '<svg id="chevron-' + j + '" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300 cat-chevron-' + safeCat.replace(/[^a-zA-Z0-9]/g, '_') + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>' +
+                                    cat + ' <span class="text-xs font-medium text-slate-400 ml-1">%' + perc + '</span> <span class="text-[10px] text-slate-300 ml-1">(' + catTxs.length + ' işlem)</span>' +
+                                '</span>' +
+                                '<span class="text-xs font-bold ' + textColor + '">' + amt.toLocaleString('tr-TR') + ' ₺</span>' +
+                            '</div>' +
+                            '<div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden shadow-inner">' +
+                                '<div class="' + colorClass + ' h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + relPerc + '%"></div>' +
+                            '</div>' +
+                        '</div>' +
+                        '<div id="cat-detail-' + safeCat.replace(/[^a-zA-Z0-9]/g, '_') + '" class="hidden mt-2 mb-1 bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">' +
+                            detailHtml +
+                        '</div>' +
+                        '</div>';
+                }
+                breakdownEl.innerHTML = barsHtml;
+            }
+        }
+        // Toggle category detail panel
+        window.toggleCatDetail = function(catName) {
+            var safeId = catName.replace(/[^a-zA-Z0-9]/g, '_');
+            var detail = document.getElementById('cat-detail-' + safeId);
+            var chevrons = document.querySelectorAll('.cat-chevron-' + safeId);
+            if (detail) {
+                var isHidden = detail.classList.contains('hidden');
+                detail.classList.toggle('hidden');
+                for (var i = 0; i < chevrons.length; i++) {
+                    if (isHidden) {
+                        chevrons[i].style.transform = 'rotate(90deg)';
+                    } else {
+                        chevrons[i].style.transform = 'rotate(0deg)';
+                    }
+                }
+            }
+        };
+
+        // Init
+        initApp();
+
+        // UI Helpers
+        window.openModal = function(type, editId) {
+            var overlay = document.getElementById('modal-overlay');
+            document.getElementById('form-type').value = type;
+            document.getElementById('form-tx-id').value = editId || '';
+            
+            overlay.classList.remove('hidden');
+            
+            if (type === 'expense') {
+                document.getElementById('modal-title').innerText = editId ? 'Harcamayı Düzenle' : 'Harcama Ekle';
+                document.getElementById('category-group').classList.remove('hidden');
+                document.getElementById('source-group').classList.remove('hidden');
+                
+                var catSelect = document.getElementById('form-category');
+                var catHtml = '';
+                for (var i = 0; i < categories.length; i++) {
+                    catHtml += '<option value="' + categories[i] + '">' + categories[i] + '</option>';
+                }
+                catSelect.innerHTML = catHtml;
+            } else {
+                document.getElementById('modal-title').innerText = editId ? 'İşlemi Düzenle' : 'Nakit Katkı / Ödeme';
+                document.getElementById('category-group').classList.add('hidden');
+                document.getElementById('source-group').classList.add('hidden');
+            }
+
+            if (editId) {
+                var tx = null;
+                for (var k = 0; k < transactions.length; k++) {
+                    if (transactions[k].id == editId) { tx = transactions[k]; break; }
+                }
+                if (tx) {
+                    document.getElementById('form-user').value = tx.user;
+                    document.getElementById('form-amount').value = tx.amount;
+                    document.getElementById('form-desc').value = tx.desc;
+                    if (type === 'expense') {
+                        if (categories.indexOf(tx.category) === -1) {
+                            var cs = document.getElementById('form-category');
+                            cs.innerHTML += '<option value="' + tx.category + '">' + tx.category + '</option>';
+                        }
+                        document.getElementById('form-category').value = tx.category;
+                        document.getElementById('form-source').value = tx.source;
+                    }
+                }
+            } else {
+                document.getElementById('transaction-form').reset();
+                document.getElementById('form-type').value = type;
+            }
+
+            setTimeout(function() { document.getElementById('form-desc').focus(); }, 100);
+        };
+
+        window.closeModal = function() {
+            document.getElementById('modal-overlay').classList.add('hidden');
+            document.getElementById('transaction-form').reset();
+        };
+    </script>
+</body>
+</html>
