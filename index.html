@@ -9,6 +9,9 @@
     <link rel="apple-touch-icon" href="data:,">
     <title>Çakallı Köyevi ve Bahçe Projesi</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
@@ -18,7 +21,6 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        /* Mobile transaction cards */
         @media (max-width: 767px) {
             .desktop-table { display: none !important; }
             .mobile-cards { display: block !important; }
@@ -28,15 +30,16 @@
         @media (min-width: 768px) {
             .mobile-cards { display: none !important; }
         }
-        /* iOS safe area */
         body { padding-bottom: env(safe-area-inset-bottom); }
+        .sync-dot { animation: pulse-sync 2s infinite; }
+        @keyframes pulse-sync { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     </style>
 </head>
 <body class="p-4 md:p-8">
     <div id="loader" class="loading-overlay">
         <div class="text-center">
             <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent"></div>
-            <p class="mt-2 text-slate-600 font-medium">Veriler Yükleniyor...</p>
+            <p class="mt-2 text-slate-600 font-medium">Firebase Bağlanıyor...</p>
         </div>
     </div>
 
@@ -45,8 +48,8 @@
             <div>
                 <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">Çakallı Köyevi ve Bahçe Projesi Bütçe Paneli</h1>
                 <div class="flex items-center gap-2 mt-1">
-                    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                    <p class="text-slate-500 text-sm font-medium">Yerel Veri Depolama Aktif</p>
+                    <span id="sync-indicator" class="w-2 h-2 bg-amber-400 rounded-full sync-dot"></span>
+                    <p id="sync-status" class="text-slate-500 text-sm font-medium">Bağlanıyor...</p>
                 </div>
             </div>
             <div class="flex gap-2 flex-wrap md:flex-nowrap mobile-btn-grid">
@@ -84,7 +87,6 @@
                     <div class="p-4 md:p-5 border-b bg-slate-50 flex justify-between items-center">
                         <h3 class="font-bold text-slate-800 text-sm md:text-base">İşlem Geçmişi</h3>
                     </div>
-                    <!-- Desktop Table -->
                     <div class="overflow-x-auto custom-scrollbar desktop-table">
                         <table class="w-full text-left">
                             <thead class="bg-slate-50 text-slate-500 text-[11px] uppercase font-bold tracking-wider">
@@ -99,7 +101,6 @@
                             <tbody id="transaction-history" class="divide-y divide-slate-100"></tbody>
                         </table>
                     </div>
-                    <!-- Mobile Cards -->
                     <div id="transaction-cards" class="mobile-cards divide-y divide-slate-100" style="display:none;"></div>
                 </div>
             </div>
@@ -178,26 +179,26 @@
     </div>
 
     <script>
+        /* ========== Firebase Init ========== */
+        var firebaseConfig = {
+            apiKey: "AIzaSyDPLI_xmxP7FpxA0r2ZENbNdiLoTJHx-Ik",
+            authDomain: "cakalli-koyevi.firebaseapp.com",
+            projectId: "cakalli-koyevi",
+            storageBucket: "cakalli-koyevi.firebasestorage.app",
+            messagingSenderId: "173844898227",
+            appId: "1:173844898227:web:2322cacda08b9844f62bc6"
+        };
+        firebase.initializeApp(firebaseConfig);
+        var db = firebase.firestore();
+
         var transactions = [];
         var categories = [];
         var defaultCategories = [
-            "Arsa/Gayrimenkul",
-            "İnşaat/Toprak",
-            "Fidan/Ağaç",
-            "Ekipman/Hortum",
-            "İşçilik",
-            "İnşaat Malzemesi",
-            "Elektrik/Aydınlatma",
-            "Su/Tesisat",
-            "Çit/Çevre Düzenleme",
-            "Nakliye/Taşıma",
-            "Mimari/Proje",
-            "Resmi Giderler/Harç",
-            "Mobilya/Dekorasyon",
-            "Güvenlik/Kamera",
-            "Bahçe Bakım",
-            "Yakıt/Enerji",
-            "Diğer"
+            "Arsa/Gayrimenkul", "İnşaat/Toprak", "Fidan/Ağaç", "Ekipman/Hortum",
+            "İşçilik", "İnşaat Malzemesi", "Elektrik/Aydınlatma", "Su/Tesisat",
+            "Çit/Çevre Düzenleme", "Nakliye/Taşıma", "Mimari/Proje",
+            "Resmi Giderler/Harç", "Mobilya/Dekorasyon", "Güvenlik/Kamera",
+            "Bahçe Bakım", "Yakıt/Enerji", "Diğer"
         ];
 
         var defaultData = [
@@ -214,41 +215,90 @@
             { id: 9, date: '2026-03-25', desc: 'MESUT NAKİT ÖDEME', amount: 13400, type: 'transfer', category: 'Nakit Ödeme', user: 'Mesut', source: 'personal', createdAt: 9 }
         ];
 
-        function initApp() {
-            var savedCats = localStorage.getItem('garden_categories_v3');
-            if (savedCats) {
-                categories = JSON.parse(savedCats);
+        /* ========== Sync Status ========== */
+        function setSyncStatus(status) {
+            var dot = document.getElementById('sync-indicator');
+            var text = document.getElementById('sync-status');
+            if (status === 'connected') {
+                dot.className = 'w-2 h-2 bg-emerald-500 rounded-full animate-pulse';
+                text.innerText = 'Firebase Bağlı - Anlık Senkron';
+            } else if (status === 'saving') {
+                dot.className = 'w-2 h-2 bg-amber-400 rounded-full sync-dot';
+                text.innerText = 'Kaydediliyor...';
             } else {
-                categories = defaultCategories.slice();
-                saveCategories();
+                dot.className = 'w-2 h-2 bg-red-400 rounded-full';
+                text.innerText = 'Bağlantı Hatası';
             }
-
-            var saved = localStorage.getItem('garden_transactions_v3');
-            if (saved) {
-                transactions = JSON.parse(saved);
-            } else {
-                transactions = defaultData.slice();
-                saveData();
-            }
-            
-            transactions.sort(function(a,b) { return new Date(b.date) - new Date(a.date); });
-            updateUI();
-            
-            setTimeout(function() {
-                document.getElementById('loader').style.opacity = '0';
-                setTimeout(function() { document.getElementById('loader').classList.add('hidden'); }, 500);
-            }, 600);
         }
 
+        /* ========== Firestore Save ========== */
         function saveData() {
-            localStorage.setItem('garden_transactions_v3', JSON.stringify(transactions));
+            setSyncStatus('saving');
+            db.collection('app').doc('transactions').set({ items: transactions }).then(function() {
+                setSyncStatus('connected');
+            }).catch(function(err) {
+                console.error('Save error:', err);
+                setSyncStatus('error');
+            });
         }
 
         function saveCategories() {
-            localStorage.setItem('garden_categories_v3', JSON.stringify(categories));
+            db.collection('app').doc('categories').set({ items: categories }).then(function() {
+                setSyncStatus('connected');
+            }).catch(function(err) {
+                console.error('Save error:', err);
+                setSyncStatus('error');
+            });
         }
 
-        /* Category Management */
+        /* ========== Init with Firestore ========== */
+        function initApp() {
+            // Listen to transactions in real-time
+            db.collection('app').doc('transactions').onSnapshot(function(doc) {
+                if (doc.exists && doc.data().items && doc.data().items.length > 0) {
+                    transactions = doc.data().items;
+                } else if (!doc.exists) {
+                    // First time: seed default data
+                    transactions = defaultData.slice();
+                    db.collection('app').doc('transactions').set({ items: transactions });
+                }
+                transactions.sort(function(a,b) { return new Date(b.date) - new Date(a.date); });
+                updateUI();
+                setSyncStatus('connected');
+                hideLoader();
+            }, function(err) {
+                console.error('Firestore listen error:', err);
+                setSyncStatus('error');
+                // Fallback to defaults
+                transactions = defaultData.slice();
+                updateUI();
+                hideLoader();
+            });
+
+            // Listen to categories in real-time
+            db.collection('app').doc('categories').onSnapshot(function(doc) {
+                if (doc.exists && doc.data().items && doc.data().items.length > 0) {
+                    categories = doc.data().items;
+                } else if (!doc.exists) {
+                    categories = defaultCategories.slice();
+                    db.collection('app').doc('categories').set({ items: categories });
+                }
+            }, function(err) {
+                console.error('Categories listen error:', err);
+                categories = defaultCategories.slice();
+            });
+        }
+
+        var loaderHidden = false;
+        function hideLoader() {
+            if (loaderHidden) return;
+            loaderHidden = true;
+            var loader = document.getElementById('loader');
+            loader.style.opacity = '0';
+            setTimeout(function() { loader.classList.add('hidden'); }, 500);
+        }
+
+        /* ========== Category Management ========== */
         window.openCategoryModal = function() {
             document.getElementById('category-modal').classList.remove('hidden');
             renderCategories();
@@ -288,7 +338,6 @@
                 }
                 var idx = categories.indexOf(oldName);
                 if (idx !== -1) categories[idx] = newName;
-                // Update all transactions with old category name
                 for (var i = 0; i < transactions.length; i++) {
                     if (transactions[i].category === oldName) {
                         transactions[i].category = newName;
@@ -296,7 +345,6 @@
                 }
                 saveCategories();
                 saveData();
-                updateUI();
                 renderCategories();
             }
         };
@@ -325,7 +373,7 @@
             list.innerHTML = html;
         }
 
-        /* Transaction Edit / Delete */
+        /* ========== Transaction Edit / Delete ========== */
         window.editTransaction = function(id) {
             var tx = null;
             for (var i = 0; i < transactions.length; i++) {
@@ -339,11 +387,10 @@
             if (confirm("Bu işlemi kalıcı olarak silmek istediğinize emin misiniz?")) {
                 transactions = transactions.filter(function(t) { return t.id !== id; });
                 saveData();
-                updateUI();
             }
         };
 
-        /* Form Handling */
+        /* ========== Form Handling ========== */
         window.handleFormSubmit = function(e) {
             e.preventDefault();
             var btn = document.getElementById('submit-btn');
@@ -387,13 +434,12 @@
 
             transactions.sort(function(a,b) { return new Date(b.date) - new Date(a.date); });
             saveData();
-            updateUI();
             closeModal();
-
             btn.disabled = false;
             btn.innerText = 'Kaydet';
         };
 
+        /* ========== UI Rendering ========== */
         function updateUI() {
             var list = document.getElementById('transaction-history');
             var mobileList = document.getElementById('transaction-cards');
@@ -402,8 +448,8 @@
 
             var totalSpent = 0;
             var vaultBalance = 0;
-            var egemenOutPocket = 0; 
-            var mesutOutPocket = 0; 
+            var egemenOutPocket = 0;
+            var mesutOutPocket = 0;
             var catTotals = {};
 
             if (transactions.length === 0) {
@@ -419,130 +465,81 @@
                 var amountColor = isExpense ? 'text-slate-700' : 'text-emerald-600';
                 var amountPrefix = isExpense ? '-' : '+';
 
-                // Desktop table row
+                // Desktop row
                 var row = document.createElement('tr');
                 row.className = "hover:bg-slate-50 transition-colors group";
                 row.innerHTML = '<td class="px-6 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap">' + tx.date + '</td>' +
-                    '<td class="px-6 py-4">' +
-                        '<div class="font-bold text-slate-800 text-[13px] uppercase">' + tx.desc + '</div>' +
-                        '<div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">' + tx.category + '</div>' +
-                    '</td>' +
-                    '<td class="px-6 py-4 text-sm">' +
-                        '<span class="px-2.5 py-1.5 rounded-lg text-[10px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' +
-                        vaultBadge +
-                    '</td>' +
-                    '<td class="px-6 py-4 text-sm font-bold text-right ' + amountColor + '">' +
-                        amountPrefix + tx.amount.toLocaleString('tr-TR') + ' ₺' +
-                    '</td>' +
-                    '<td class="px-4 py-4 text-center whitespace-nowrap">' +
-                        '<div class="flex justify-center items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">' +
-                            '<button onclick="editTransaction(' + tx.id + ')" class="text-indigo-500 hover:text-indigo-700 p-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition" title="Düzenle">' +
-                                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>' +
-                            '</button>' +
-                            '<button onclick="deleteTransaction(' + tx.id + ')" class="text-rose-500 hover:text-rose-700 p-1.5 bg-rose-50 hover:bg-rose-100 rounded-lg transition" title="Sil">' +
-                                '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
-                            '</button>' +
-                        '</div>' +
-                    '</td>';
+                    '<td class="px-6 py-4"><div class="font-bold text-slate-800 text-[13px] uppercase">' + tx.desc + '</div><div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">' + tx.category + '</div></td>' +
+                    '<td class="px-6 py-4 text-sm"><span class="px-2.5 py-1.5 rounded-lg text-[10px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' + vaultBadge + '</td>' +
+                    '<td class="px-6 py-4 text-sm font-bold text-right ' + amountColor + '">' + amountPrefix + tx.amount.toLocaleString('tr-TR') + ' ₺</td>' +
+                    '<td class="px-4 py-4 text-center whitespace-nowrap"><div class="flex justify-center items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">' +
+                    '<button onclick="editTransaction(' + tx.id + ')" class="text-indigo-500 hover:text-indigo-700 p-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition" title="Düzenle"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>' +
+                    '<button onclick="deleteTransaction(' + tx.id + ')" class="text-rose-500 hover:text-rose-700 p-1.5 bg-rose-50 hover:bg-rose-100 rounded-lg transition" title="Sil"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>' +
+                    '</div></td>';
                 list.appendChild(row);
 
                 // Mobile card
                 var card = document.createElement('div');
                 card.className = 'p-4 hover:bg-slate-50 transition-colors';
-                card.innerHTML = '<div class="flex justify-between items-start mb-2">' +
-                        '<div class="flex-1 min-w-0 pr-3">' +
-                            '<div class="font-bold text-slate-800 text-[13px] uppercase truncate">' + tx.desc + '</div>' +
-                            '<div class="flex items-center gap-2 mt-1.5 flex-wrap">' +
-                                '<span class="text-[10px] text-slate-400 font-semibold">' + tx.date + '</span>' +
-                                '<span class="px-2 py-0.5 rounded text-[9px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' +
-                                vaultBadge +
-                                '<span class="text-[9px] text-slate-300 uppercase tracking-widest font-bold">' + tx.category + '</span>' +
-                            '</div>' +
-                        '</div>' +
-                        '<div class="text-right shrink-0">' +
-                            '<div class="text-sm font-bold ' + amountColor + '">' + amountPrefix + tx.amount.toLocaleString('tr-TR') + ' ₺</div>' +
-                            '<div class="flex gap-1 mt-1.5 justify-end">' +
-                                '<button onclick="editTransaction(' + tx.id + ')" class="text-indigo-500 p-1.5 bg-indigo-50 rounded-lg active:bg-indigo-100">' +
-                                    '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>' +
-                                '</button>' +
-                                '<button onclick="deleteTransaction(' + tx.id + ')" class="text-rose-500 p-1.5 bg-rose-50 rounded-lg active:bg-rose-100">' +
-                                    '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>' +
-                                '</button>' +
-                            '</div>' +
-                        '</div>' +
-                    '</div>';
+                card.innerHTML = '<div class="flex justify-between items-start">' +
+                    '<div class="flex-1 min-w-0 pr-3">' +
+                    '<div class="font-bold text-slate-800 text-[13px] uppercase truncate">' + tx.desc + '</div>' +
+                    '<div class="flex items-center gap-2 mt-1.5 flex-wrap">' +
+                    '<span class="text-[10px] text-slate-400 font-semibold">' + tx.date + '</span>' +
+                    '<span class="px-2 py-0.5 rounded text-[9px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' + vaultBadge +
+                    '<span class="text-[9px] text-slate-300 uppercase tracking-widest font-bold">' + tx.category + '</span>' +
+                    '</div></div>' +
+                    '<div class="text-right shrink-0">' +
+                    '<div class="text-sm font-bold ' + amountColor + '">' + amountPrefix + tx.amount.toLocaleString('tr-TR') + ' ₺</div>' +
+                    '<div class="flex gap-1 mt-1.5 justify-end">' +
+                    '<button onclick="editTransaction(' + tx.id + ')" class="text-indigo-500 p-1.5 bg-indigo-50 rounded-lg active:bg-indigo-100"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>' +
+                    '<button onclick="deleteTransaction(' + tx.id + ')" class="text-rose-500 p-1.5 bg-rose-50 rounded-lg active:bg-rose-100"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>' +
+                    '</div></div></div>';
                 mobileList.appendChild(card);
 
+                // Calculate totals
                 if (tx.type === 'expense') {
                     totalSpent += tx.amount;
                     if (!catTotals[tx.category]) catTotals[tx.category] = 0;
                     catTotals[tx.category] += tx.amount;
-                    
-                    if (tx.source === 'vault') {
-                        vaultBalance -= tx.amount;
-                    } else {
-                        if (tx.user === 'Egemen') egemenOutPocket += tx.amount;
-                        else mesutOutPocket += tx.amount;
-                    }
+                    if (tx.source === 'vault') { vaultBalance -= tx.amount; }
+                    else { if (tx.user === 'Egemen') egemenOutPocket += tx.amount; else mesutOutPocket += tx.amount; }
                 } else if (tx.type === 'transfer') {
-                    if (tx.user === 'Egemen') {
-                        egemenOutPocket += tx.amount;
-                        mesutOutPocket -= tx.amount;
-                    } else {
-                        mesutOutPocket += tx.amount;
-                        egemenOutPocket -= tx.amount;
-                    }
+                    if (tx.user === 'Egemen') { egemenOutPocket += tx.amount; mesutOutPocket -= tx.amount; }
+                    else { mesutOutPocket += tx.amount; egemenOutPocket -= tx.amount; }
                 }
             }
 
             document.getElementById('total-spent').innerText = totalSpent.toLocaleString('tr-TR') + ' ₺';
             document.getElementById('vault-balance').innerText = vaultBalance.toLocaleString('tr-TR') + ' ₺';
 
+            // Settlement
             var totalOutPocket = egemenOutPocket + mesutOutPocket;
             var target = totalOutPocket / 2;
             var statusEl = document.getElementById('settlement-status');
             var cardEl = document.getElementById('settlement-card');
-
             if (egemenOutPocket > target + 1) {
                 statusEl.innerText = "Mesut, Egemen'e " + (egemenOutPocket - target).toLocaleString('tr-TR') + ' ₺ vermeli.';
-                cardEl.className = "card p-6 border-l-4 border-amber-500 col-span-1 md:col-span-2";
+                cardEl.className = "card p-4 md:p-6 border-l-4 border-amber-500 col-span-2 md:col-span-2";
             } else if (mesutOutPocket > target + 1) {
                 statusEl.innerText = "Egemen, Mesut'a " + (mesutOutPocket - target).toLocaleString('tr-TR') + ' ₺ vermeli.';
-                cardEl.className = "card p-6 border-l-4 border-amber-500 col-span-1 md:col-span-2";
+                cardEl.className = "card p-4 md:p-6 border-l-4 border-amber-500 col-span-2 md:col-span-2";
             } else {
                 statusEl.innerText = 'Durum Tamamen Dengeli.';
-                cardEl.className = "card p-6 border-l-4 border-emerald-500 col-span-1 md:col-span-2";
+                cardEl.className = "card p-4 md:p-6 border-l-4 border-emerald-500 col-span-2 md:col-span-2";
             }
 
-            // Partner Stats Bars
+            // Partner Stats
             var partnerStats = document.getElementById('partner-stats');
             var egemenPerc = totalOutPocket > 0 ? (egemenOutPocket / totalOutPocket * 100) : 0;
             var mesutPerc = totalOutPocket > 0 ? (mesutOutPocket / totalOutPocket * 100) : 0;
+            partnerStats.innerHTML = '<div><div class="flex justify-between text-xs mb-1.5 font-bold"><span class="text-slate-600">Egemen <span class="text-slate-400 font-normal">(Net Katkı)</span></span><span class="text-indigo-600">' + egemenOutPocket.toLocaleString('tr-TR') + ' ₺</span></div><div class="w-full bg-slate-100 rounded-full h-3 mb-5 overflow-hidden shadow-inner"><div class="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + egemenPerc + '%"></div></div></div>' +
+                '<div><div class="flex justify-between text-xs mb-1.5 font-bold"><span class="text-slate-600">Mesut <span class="text-slate-400 font-normal">(Net Katkı)</span></span><span class="text-purple-600">' + mesutOutPocket.toLocaleString('tr-TR') + ' ₺</span></div><div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner"><div class="bg-purple-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + mesutPerc + '%"></div></div></div>';
 
-            partnerStats.innerHTML = '<div>' +
-                '<div class="flex justify-between text-xs mb-1.5 font-bold">' +
-                    '<span class="text-slate-600">Egemen <span class="text-slate-400 font-normal">(Net Katkı)</span></span>' +
-                    '<span class="text-indigo-600">' + egemenOutPocket.toLocaleString('tr-TR') + ' ₺</span>' +
-                '</div>' +
-                '<div class="w-full bg-slate-100 rounded-full h-3 mb-5 overflow-hidden shadow-inner">' +
-                    '<div class="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + egemenPerc + '%"></div>' +
-                '</div>' +
-                '</div><div>' +
-                '<div class="flex justify-between text-xs mb-1.5 font-bold">' +
-                    '<span class="text-slate-600">Mesut <span class="text-slate-400 font-normal">(Net Katkı)</span></span>' +
-                    '<span class="text-purple-600">' + mesutOutPocket.toLocaleString('tr-TR') + ' ₺</span>' +
-                '</div>' +
-                '<div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner">' +
-                    '<div class="bg-purple-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + mesutPerc + '%"></div>' +
-                '</div>' +
-                '</div>';
-
-            // Category Breakdown Bars
+            // Category Breakdown
             var breakdownEl = document.getElementById('category-breakdown');
             var sortedCats = [];
-            for (var catName in catTotals) {
-                if (catTotals[catName] > 0) sortedCats.push([catName, catTotals[catName]]);
-            }
+            for (var catName in catTotals) { if (catTotals[catName] > 0) sortedCats.push([catName, catTotals[catName]]); }
             sortedCats.sort(function(a, b) { return b[1] - a[1]; });
 
             if (sortedCats.length === 0) {
@@ -560,51 +557,27 @@
                     var colorClass = barColors[j % barColors.length];
                     var textColor = textColors[j % textColors.length];
                     var safeCat = cat.replace(/'/g, "\\'");
-                    
-                    // Get transactions for this category
                     var catTxs = [];
                     for (var k = 0; k < transactions.length; k++) {
-                        if (transactions[k].type === 'expense' && transactions[k].category === cat) {
-                            catTxs.push(transactions[k]);
-                        }
+                        if (transactions[k].type === 'expense' && transactions[k].category === cat) catTxs.push(transactions[k]);
                     }
-                    
-                    // Build detail rows
                     var detailHtml = '';
                     for (var m = 0; m < catTxs.length; m++) {
                         var t = catTxs[m];
-                        var userColor = t.user === 'Egemen' ? 'text-indigo-600' : 'text-purple-600';
-                        detailHtml += '<div class="flex justify-between items-center py-2 px-3 border-b border-slate-100 last:border-0">' +
-                            '<div class="flex-1 min-w-0">' +
-                                '<div class="text-xs font-semibold text-slate-700 truncate">' + t.desc + '</div>' +
-                                '<div class="text-[10px] text-slate-400 mt-0.5">' + t.date + ' · <span class="' + userColor + ' font-bold">' + t.user + '</span></div>' +
-                            '</div>' +
-                            '<span class="text-xs font-bold text-slate-600 ml-3 whitespace-nowrap">' + t.amount.toLocaleString('tr-TR') + ' ₺</span>' +
-                        '</div>';
+                        var uc = t.user === 'Egemen' ? 'text-indigo-600' : 'text-purple-600';
+                        detailHtml += '<div class="flex justify-between items-center py-2 px-3 border-b border-slate-100 last:border-0"><div class="flex-1 min-w-0"><div class="text-xs font-semibold text-slate-700 truncate">' + t.desc + '</div><div class="text-[10px] text-slate-400 mt-0.5">' + t.date + ' · <span class="' + uc + ' font-bold">' + t.user + '</span></div></div><span class="text-xs font-bold text-slate-600 ml-3 whitespace-nowrap">' + t.amount.toLocaleString('tr-TR') + ' ₺</span></div>';
                     }
-                    
-                    barsHtml += '<div>' +
-                        '<div class="cursor-pointer select-none" onclick="toggleCatDetail(\'' + safeCat + '\')">' +
-                            '<div class="flex justify-between items-end mb-1.5">' +
-                                '<span class="text-sm font-bold text-slate-700 flex items-center gap-1">' +
-                                    '<svg id="chevron-' + j + '" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300 cat-chevron-' + safeCat.replace(/[^a-zA-Z0-9]/g, '_') + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>' +
-                                    cat + ' <span class="text-xs font-medium text-slate-400 ml-1">%' + perc + '</span> <span class="text-[10px] text-slate-300 ml-1">(' + catTxs.length + ' işlem)</span>' +
-                                '</span>' +
-                                '<span class="text-xs font-bold ' + textColor + '">' + amt.toLocaleString('tr-TR') + ' ₺</span>' +
-                            '</div>' +
-                            '<div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden shadow-inner">' +
-                                '<div class="' + colorClass + ' h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + relPerc + '%"></div>' +
-                            '</div>' +
-                        '</div>' +
-                        '<div id="cat-detail-' + safeCat.replace(/[^a-zA-Z0-9]/g, '_') + '" class="hidden mt-2 mb-1 bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">' +
-                            detailHtml +
-                        '</div>' +
-                        '</div>';
+                    var safeId = safeCat.replace(/[^a-zA-Z0-9]/g, '_');
+                    barsHtml += '<div><div class="cursor-pointer select-none" onclick="toggleCatDetail(\'' + safeCat + '\')">' +
+                        '<div class="flex justify-between items-end mb-1.5"><span class="text-sm font-bold text-slate-700 flex items-center gap-1"><svg class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300 cat-chevron-' + safeId + '" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>' + cat + ' <span class="text-xs font-medium text-slate-400 ml-1">%' + perc + '</span> <span class="text-[10px] text-slate-300 ml-1">(' + catTxs.length + ' işlem)</span></span><span class="text-xs font-bold ' + textColor + '">' + amt.toLocaleString('tr-TR') + ' ₺</span></div>' +
+                        '<div class="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden shadow-inner"><div class="' + colorClass + ' h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + relPerc + '%"></div></div></div>' +
+                        '<div id="cat-detail-' + safeId + '" class="hidden mt-2 mb-1 bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">' + detailHtml + '</div></div>';
                 }
                 breakdownEl.innerHTML = barsHtml;
             }
         }
-        // Toggle category detail panel
+
+        // Toggle category detail
         window.toggleCatDetail = function(catName) {
             var safeId = catName.replace(/[^a-zA-Z0-9]/g, '_');
             var detail = document.getElementById('cat-detail-' + safeId);
@@ -613,11 +586,7 @@
                 var isHidden = detail.classList.contains('hidden');
                 detail.classList.toggle('hidden');
                 for (var i = 0; i < chevrons.length; i++) {
-                    if (isHidden) {
-                        chevrons[i].style.transform = 'rotate(90deg)';
-                    } else {
-                        chevrons[i].style.transform = 'rotate(0deg)';
-                    }
+                    chevrons[i].style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
                 }
             }
         };
@@ -630,14 +599,11 @@
             var overlay = document.getElementById('modal-overlay');
             document.getElementById('form-type').value = type;
             document.getElementById('form-tx-id').value = editId || '';
-            
             overlay.classList.remove('hidden');
-            
             if (type === 'expense') {
                 document.getElementById('modal-title').innerText = editId ? 'Harcamayı Düzenle' : 'Harcama Ekle';
                 document.getElementById('category-group').classList.remove('hidden');
                 document.getElementById('source-group').classList.remove('hidden');
-                
                 var catSelect = document.getElementById('form-category');
                 var catHtml = '';
                 for (var i = 0; i < categories.length; i++) {
@@ -649,7 +615,6 @@
                 document.getElementById('category-group').classList.add('hidden');
                 document.getElementById('source-group').classList.add('hidden');
             }
-
             if (editId) {
                 var tx = null;
                 for (var k = 0; k < transactions.length; k++) {
@@ -672,7 +637,6 @@
                 document.getElementById('transaction-form').reset();
                 document.getElementById('form-type').value = type;
             }
-
             setTimeout(function() { document.getElementById('form-desc').focus(); }, 100);
         };
 
