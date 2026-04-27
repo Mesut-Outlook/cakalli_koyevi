@@ -262,7 +262,10 @@
                     transactions = defaultData.slice();
                     db.collection('app').doc('transactions').set({ items: transactions });
                 }
-                transactions.sort(function(a,b) { return new Date(b.date) - new Date(a.date); });
+                transactions.sort(function(a,b) { 
+                    var diff = new Date(b.date) - new Date(a.date);
+                    return diff !== 0 ? diff : ((b.createdAt || 0) - (a.createdAt || 0));
+                });
                 updateUI();
                 setSyncStatus('connected');
                 hideLoader();
@@ -432,7 +435,10 @@
                 transactions.push(newTx);
             }
 
-            transactions.sort(function(a,b) { return new Date(b.date) - new Date(a.date); });
+            transactions.sort(function(a,b) { 
+                var diff = new Date(b.date) - new Date(a.date);
+                return diff !== 0 ? diff : ((b.createdAt || 0) - (a.createdAt || 0));
+            });
             saveData();
             closeModal();
             btn.disabled = false;
