@@ -35,13 +35,46 @@
         @keyframes pulse-sync { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     </style>
 </head>
-<body class="p-4 md:p-8">
-    <div id="loader" class="loading-overlay">
-        <div class="text-center">
-            <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent"></div>
-            <p class="mt-2 text-slate-600 font-medium">Firebase Bağlanıyor...</p>
+<body class="bg-slate-50">
+    <!-- Login Screen -->
+    <div id="login-screen" class="fixed inset-0 bg-slate-100 flex items-center justify-center p-4 z-[100] hidden">
+        <div class="bg-white rounded-3xl max-w-sm w-full p-8 shadow-2xl border border-slate-200">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-800 tracking-tight">Giriş Yap</h2>
+                <p class="text-sm text-slate-500 mt-2">Bütçe paneline erişmek için giriş yapın.</p>
+            </div>
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Kullanıcı</label>
+                        <select id="login-username" class="w-full p-3.5 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition font-medium" required>
+                            <option value="">Seçiniz</option>
+                            <option value="mesut">Mesut</option>
+                            <option value="egemen">Egemen</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1">Şifre</label>
+                        <input type="password" id="login-password" class="w-full p-3.5 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition font-medium tracking-widest" placeholder="••••" required>
+                    </div>
+                    <div id="login-error" class="hidden text-rose-600 text-sm font-semibold text-center bg-rose-50 p-3 rounded-xl border border-rose-100">Şifre veya kullanıcı hatalı!</div>
+                </div>
+                <button type="submit" class="w-full mt-8 px-4 py-3.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition font-bold shadow-lg shadow-emerald-200 text-lg">Giriş Yap</button>
+            </form>
         </div>
     </div>
+
+    <!-- Main App Wrapper -->
+    <div id="app-wrapper" class="hidden p-4 md:p-8">
+        <div id="loader" class="loading-overlay hidden">
+            <div class="text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-emerald-500 border-t-transparent"></div>
+                <p class="mt-2 text-slate-600 font-medium">Firebase Bağlanıyor...</p>
+            </div>
+        </div>
 
     <div class="max-w-6xl mx-auto">
         <header class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -84,14 +117,26 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
             <div class="lg:col-span-2">
                 <div class="card overflow-hidden">
-                    <div class="p-4 md:p-5 border-b bg-slate-50 flex justify-between items-center">
-                        <h3 class="font-bold text-slate-800 text-sm md:text-base">İşlem Geçmişi</h3>
+                    <div class="p-4 md:p-5 border-b bg-slate-50">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="font-bold text-slate-800 text-sm md:text-base">İşlem Geçmişi</h3>
+                            <span id="tx-count-badge" class="text-[11px] font-bold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full"></span>
+                        </div>
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <div class="relative flex-1">
+                                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"></path></svg>
+                                <input type="text" id="search-input" placeholder="İşlem adında ara..." oninput="applyFilters()" class="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-400 bg-white transition">
+                            </div>
+                            <select id="month-filter" onchange="applyFilters()" class="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-400 bg-white text-slate-600 font-medium transition">
+                                <option value="">Tüm Aylar</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="overflow-x-auto custom-scrollbar desktop-table">
                         <table class="w-full text-left">
                             <thead class="bg-slate-50 text-slate-500 text-[11px] uppercase font-bold tracking-wider">
                                 <tr>
-                                    <th class="px-6 py-4">Tarih</th>
+                                    <th class="px-6 py-4">Tarih / Saat</th>
                                     <th class="px-6 py-4">Açıklama</th>
                                     <th class="px-6 py-4">Kişi</th>
                                     <th class="px-6 py-4 text-right">Tutar</th>
@@ -177,6 +222,7 @@
             </form>
         </div>
     </div>
+    </div> <!-- End of App Wrapper -->
 
     <script>
         /* ========== Firebase Init ========== */
@@ -421,16 +467,18 @@
                     }
                 }
             } else {
+                var now = new Date();
                 var newTx = {
                     id: Date.now(),
-                    date: new Date().toISOString().split('T')[0],
+                    date: now.toISOString().split('T')[0],
+                    time: now.toTimeString().slice(0, 5),
                     type: type,
                     user: user,
                     amount: amount,
                     desc: desc,
                     category: type === 'expense' ? category : 'Nakit Ödeme',
                     source: type === 'expense' ? source : 'personal',
-                    createdAt: Date.now()
+                    createdAt: now.getTime()
                 };
                 transactions.push(newTx);
             }
@@ -445,36 +493,80 @@
             btn.innerText = 'Kaydet';
         };
 
+        /* ========== Month filter options ========== */
+        function updateMonthFilter() {
+            var sel = document.getElementById('month-filter');
+            if (!sel) return;
+            var current = sel.value;
+            var months = {};
+            for (var i = 0; i < transactions.length; i++) {
+                var d = transactions[i].date;
+                if (d) {
+                    var ym = d.slice(0, 7); // "YYYY-MM"
+                    if (!months[ym]) months[ym] = true;
+                }
+            }
+            var keys = Object.keys(months).sort().reverse();
+            var html = '<option value="">Tüm Aylar</option>';
+            var trMonths = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+            for (var j = 0; j < keys.length; j++) {
+                var parts = keys[j].split('-');
+                var label = trMonths[parseInt(parts[1], 10) - 1] + ' ' + parts[0];
+                html += '<option value="' + keys[j] + '">' + label + '</option>';
+            }
+            sel.innerHTML = html;
+            if (current) sel.value = current;
+        }
+
+        /* ========== Filter logic ========== */
+        window.applyFilters = function() {
+            var search = (document.getElementById('search-input').value || '').trim().toLowerCase();
+            var month = document.getElementById('month-filter').value;
+            var filtered = transactions.filter(function(tx) {
+                var matchSearch = !search || tx.desc.toLowerCase().indexOf(search) !== -1;
+                var matchMonth = !month || (tx.date && tx.date.slice(0, 7) === month);
+                return matchSearch && matchMonth;
+            });
+            renderTransactions(filtered);
+        };
+
         /* ========== UI Rendering ========== */
         function updateUI() {
+            updateMonthFilter();
+            applyFilters();
+            renderStats();
+        }
+
+        function renderTransactions(txList) {
             var list = document.getElementById('transaction-history');
             var mobileList = document.getElementById('transaction-cards');
+            var badge = document.getElementById('tx-count-badge');
             list.innerHTML = '';
             mobileList.innerHTML = '';
 
-            var totalSpent = 0;
-            var vaultBalance = 0;
-            var egemenOutPocket = 0;
-            var mesutOutPocket = 0;
-            var catTotals = {};
+            if (badge) badge.textContent = txList.length + ' işlem';
 
-            if (transactions.length === 0) {
-                list.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400 italic">Henüz hiç işlem bulunmuyor.</td></tr>';
-                mobileList.innerHTML = '<div class="p-6 text-center text-slate-400 italic text-sm">Henüz hiç işlem bulunmuyor.</div>';
+            if (txList.length === 0) {
+                list.innerHTML = '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400 italic">Eşleşen işlem bulunamadı.</td></tr>';
+                mobileList.innerHTML = '<div class="p-6 text-center text-slate-400 italic text-sm">Eşleşen işlem bulunamadı.</div>';
+                return;
             }
 
-            for (var i = 0; i < transactions.length; i++) {
-                var tx = transactions[i];
+            for (var i = 0; i < txList.length; i++) {
+                var tx = txList[i];
                 var isExpense = tx.type === 'expense';
                 var userBadge = tx.user === 'Egemen' ? 'bg-indigo-100 text-indigo-700' : 'bg-purple-100 text-purple-700';
                 var vaultBadge = tx.source === 'vault' ? '<span class="ml-1 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold shadow-sm">KASA</span>' : '';
                 var amountColor = isExpense ? 'text-slate-700' : 'text-emerald-600';
                 var amountPrefix = isExpense ? '-' : '+';
+                var timeStr = tx.time ? tx.time : '';
+                var dateDisplay = tx.date + (timeStr ? '<span class="text-slate-400 font-normal ml-1">' + timeStr + '</span>' : '');
+                var dateDisplayMobile = tx.date + (timeStr ? ' ' + timeStr : '');
 
                 // Desktop row
                 var row = document.createElement('tr');
                 row.className = "hover:bg-slate-50 transition-colors group";
-                row.innerHTML = '<td class="px-6 py-4 text-xs font-semibold text-slate-500 whitespace-nowrap">' + tx.date + '</td>' +
+                row.innerHTML = '<td class="px-6 py-4 whitespace-nowrap"><span class="text-xs font-semibold text-slate-600">' + dateDisplay + '</span></td>' +
                     '<td class="px-6 py-4"><div class="font-bold text-slate-800 text-[13px] uppercase">' + tx.desc + '</div><div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">' + tx.category + '</div></td>' +
                     '<td class="px-6 py-4 text-sm"><span class="px-2.5 py-1.5 rounded-lg text-[10px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' + vaultBadge + '</td>' +
                     '<td class="px-6 py-4 text-sm font-bold text-right ' + amountColor + '">' + amountPrefix + tx.amount.toLocaleString('tr-TR') + ' ₺</td>' +
@@ -491,7 +583,7 @@
                     '<div class="flex-1 min-w-0 pr-3">' +
                     '<div class="font-bold text-slate-800 text-[13px] uppercase truncate">' + tx.desc + '</div>' +
                     '<div class="flex items-center gap-2 mt-1.5 flex-wrap">' +
-                    '<span class="text-[10px] text-slate-400 font-semibold">' + tx.date + '</span>' +
+                    '<span class="text-[10px] text-slate-400 font-semibold">' + dateDisplayMobile + '</span>' +
                     '<span class="px-2 py-0.5 rounded text-[9px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' + vaultBadge +
                     '<span class="text-[9px] text-slate-300 uppercase tracking-widest font-bold">' + tx.category + '</span>' +
                     '</div></div>' +
@@ -502,8 +594,18 @@
                     '<button onclick="deleteTransaction(' + tx.id + ')" class="text-rose-500 p-1.5 bg-rose-50 rounded-lg active:bg-rose-100"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>' +
                     '</div></div></div>';
                 mobileList.appendChild(card);
+            }
+        }
 
-                // Calculate totals
+        function renderStats() {
+            var totalSpent = 0;
+            var vaultBalance = 0;
+            var egemenOutPocket = 0;
+            var mesutOutPocket = 0;
+            var catTotals = {};
+
+            for (var i = 0; i < transactions.length; i++) {
+                var tx = transactions[i];
                 if (tx.type === 'expense') {
                     totalSpent += tx.amount;
                     if (!catTotals[tx.category]) catTotals[tx.category] = 0;
@@ -597,8 +699,71 @@
             }
         };
 
+        /* ========== Login Logic ========== */
+        const users = {
+            "mesut": "2025",
+            "egemen": "2025"
+        };
+
+        function checkLogin() {
+            const loggedInUser = localStorage.getItem('budgetAppUser');
+            if (loggedInUser && users[loggedInUser]) {
+                showApp(loggedInUser);
+            } else {
+                document.getElementById('loader').classList.add('hidden');
+                document.getElementById('login-screen').classList.remove('hidden');
+                document.getElementById('app-wrapper').classList.add('hidden');
+            }
+        }
+
+        window.handleLogin = function(e) {
+            e.preventDefault();
+            const username = document.getElementById('login-username').value;
+            const pass = document.getElementById('login-password').value;
+            
+            if (users[username] && users[username] === pass) {
+                localStorage.setItem('budgetAppUser', username);
+                document.getElementById('login-error').classList.add('hidden');
+                showApp(username);
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        };
+
+        window.logout = function() {
+            localStorage.removeItem('budgetAppUser');
+            location.reload();
+        };
+
+        function showApp(username) {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-wrapper').classList.remove('hidden');
+            
+            var capUser = username.charAt(0).toUpperCase() + username.slice(1);
+            var formUserEl = document.getElementById('form-user');
+            if (formUserEl) {
+                formUserEl.value = capUser;
+            }
+
+            document.getElementById('loader').classList.remove('hidden');
+            document.getElementById('loader').style.opacity = '1';
+            loaderHidden = false;
+
+            var headerDiv = document.querySelector('header > div:first-child');
+            if (!document.getElementById('logout-btn')) {
+                var logoutBtn = document.createElement('button');
+                logoutBtn.id = 'logout-btn';
+                logoutBtn.className = 'mt-3 px-3 py-1.5 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-lg transition flex items-center gap-2 font-semibold text-sm w-max';
+                logoutBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg> Çıkış Yap (' + capUser + ')';
+                logoutBtn.onclick = logout;
+                headerDiv.appendChild(logoutBtn);
+            }
+
+            initApp();
+        }
+
         // Init
-        initApp();
+        checkLogin();
 
         // UI Helpers
         window.openModal = function(type, editId) {
