@@ -560,13 +560,13 @@
                 var amountColor = isExpense ? 'text-slate-700' : 'text-emerald-600';
                 var amountPrefix = isExpense ? '-' : '+';
                 var timeStr = tx.time ? tx.time : '';
-                var dateDisplay = tx.date + (timeStr ? '<span class="text-slate-400 font-normal ml-1">' + timeStr + '</span>' : '');
-                var dateDisplayMobile = tx.date + (timeStr ? ' ' + timeStr : '');
+                var dateDisplay = tx.date + (timeStr ? '</div><div class="text-[10px] text-slate-400 font-normal mt-0.5">' + timeStr : '');
+                var dateDisplayMobile = '<span>' + tx.date + '</span>' + (timeStr ? '<span class="block text-[9px] text-slate-300 font-normal leading-tight">' + timeStr + '</span>' : '');
 
                 // Desktop row
                 var row = document.createElement('tr');
                 row.className = "hover:bg-slate-50 transition-colors group";
-                row.innerHTML = '<td class="px-6 py-4 whitespace-nowrap"><span class="text-xs font-semibold text-slate-600">' + dateDisplay + '</span></td>' +
+                row.innerHTML = '<td class="px-6 py-4 whitespace-nowrap"><div class="text-xs font-semibold text-slate-600 leading-tight">' + dateDisplay + '</div></td>' +
                     '<td class="px-6 py-4"><div class="font-bold text-slate-800 text-[13px] uppercase">' + tx.desc + '</div><div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">' + tx.category + '</div></td>' +
                     '<td class="px-6 py-4 text-sm"><span class="px-2.5 py-1.5 rounded-lg text-[10px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' + vaultBadge + '</td>' +
                     '<td class="px-6 py-4 text-sm font-bold text-right ' + amountColor + '">' + amountPrefix + tx.amount.toLocaleString('tr-TR') + ' ₺</td>' +
