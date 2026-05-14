@@ -2,6 +2,20 @@
 
 > Bu dosya her oturumda otomatik yüklenir. Kodu yeniden okumaya gerek kalmadan direkt çalışmaya başlanabilir.
 
+## Memory Dosyaları
+
+Kalıcı proje notları (session'lar arası korunur):
+
+```
+~/.claude/projects/-Users-mesutozdemir--PROJELER-CAKALLI-PROJESI/memory/
+├── MEMORY.md                    ← index
+├── project_handoff_state.md     ← son durum, açık işler, commit geçmişi
+├── project_architecture.md      ← veri modeli, Firebase yapısı, satır referansları
+└── project_business_rules.md    ← kullanıcılar, dengeleme, taksit, form kuralları
+```
+
+**Her oturumun başında** `project_handoff_state.md` okunmalı.
+
 ## Proje Özeti
 
 Tek sayfalık bütçe takip uygulaması. Mesut ve Egemen'in ortak arazi/yapı projesinin harcamalarını, nakit transferlerini ve kredi kartı taksitlerini Firebase ile anlık senkronize eder.
