@@ -54,6 +54,7 @@
                             <option value="">Seçiniz</option>
                             <option value="mesut">Mesut</option>
                             <option value="egemen">Egemen</option>
+                            <option value="halil">Halil</option>
                         </select>
                     </div>
                     <div>
@@ -159,6 +160,15 @@
                     <h3 class="font-bold text-slate-800 mb-6">Ortak Net Katkı Oranları</h3>
                     <div class="space-y-5" id="partner-stats"></div>
                 </div>
+                <div class="card p-6" id="installment-calendar-card">
+                    <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                        Kredi Kartı Taksit Takvimi
+                    </h3>
+                    <div id="installment-calendar">
+                        <p class="text-sm text-slate-400 italic text-center py-2">Kredi kartı işlemi bulunmuyor.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -193,6 +203,7 @@
                         <select id="form-user" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition" required>
                             <option value="Egemen">Egemen</option>
                             <option value="Mesut">Mesut</option>
+                            <option value="Halil">Halil</option>
                         </select>
                     </div>
                     <div id="category-group">
@@ -201,10 +212,31 @@
                     </div>
                     <div id="source-group">
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Ödeme Kaynağı</label>
-                        <select id="form-source" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition">
+                        <select id="form-source" onchange="handleSourceChange()" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition">
                             <option value="personal">Kendi Cebinden</option>
                             <option value="vault">Ortak Kasadan</option>
+                            <option value="credit">Kredi Kartından</option>
                         </select>
+                    </div>
+                    <!-- Kredi Kartı Taksit Seçenekleri -->
+                    <div id="installment-group" class="hidden">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Ödeme Şekli</label>
+                        <div class="flex gap-2 mb-3">
+                            <button type="button" id="btn-tek" onclick="setInstallmentType('tek')" class="flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition bg-amber-500 text-white border-amber-500">Tek Çekim</button>
+                            <button type="button" id="btn-taksit" onclick="setInstallmentType('taksit')" class="flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition bg-white text-slate-500 border-slate-300">Taksitli</button>
+                        </div>
+                        <div id="taksit-count-group" class="hidden">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Taksit Sayısı</label>
+                            <select id="form-installments" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50 transition font-semibold">
+                                <option value="2">2 Taksit</option>
+                                <option value="3">3 Taksit</option>
+                                <option value="6">6 Taksit</option>
+                                <option value="9">9 Taksit</option>
+                                <option value="12">12 Taksit</option>
+                                <option value="18">18 Taksit</option>
+                                <option value="24">24 Taksit</option>
+                            </select>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">Açıklama</label>
@@ -454,6 +486,15 @@
             var category = document.getElementById('form-category').value;
             var source = document.getElementById('form-source').value;
 
+            // Taksit hesapla
+            var installments = 1;
+            if (type === 'expense' && source === 'credit') {
+                var taksitCountGroup = document.getElementById('taksit-count-group');
+                if (taksitCountGroup && !taksitCountGroup.classList.contains('hidden')) {
+                    installments = parseInt(document.getElementById('form-installments').value) || 2;
+                }
+            }
+
             if (editId) {
                 for (var i = 0; i < transactions.length; i++) {
                     if (transactions[i].id == editId) {
@@ -463,6 +504,7 @@
                         transactions[i].desc = desc;
                         transactions[i].category = type === 'expense' ? category : 'Nakit Ödeme';
                         transactions[i].source = type === 'expense' ? source : 'personal';
+                        transactions[i].installments = (type === 'expense' && source === 'credit') ? installments : 1;
                         break;
                     }
                 }
@@ -478,6 +520,7 @@
                     desc: desc,
                     category: type === 'expense' ? category : 'Nakit Ödeme',
                     source: type === 'expense' ? source : 'personal',
+                    installments: installments,
                     createdAt: now.getTime()
                 };
                 transactions.push(newTx);
@@ -535,6 +578,7 @@
             updateMonthFilter();
             applyFilters();
             renderStats();
+            renderInstallmentCalendar();
         }
 
         function renderTransactions(txList) {
@@ -555,8 +599,15 @@
             for (var i = 0; i < txList.length; i++) {
                 var tx = txList[i];
                 var isExpense = tx.type === 'expense';
-                var userBadge = tx.user === 'Egemen' ? 'bg-indigo-100 text-indigo-700' : 'bg-purple-100 text-purple-700';
-                var vaultBadge = tx.source === 'vault' ? '<span class="ml-1 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold shadow-sm">KASA</span>' : '';
+                var userBadge = tx.user === 'Egemen' ? 'bg-indigo-100 text-indigo-700' : tx.user === 'Halil' ? 'bg-teal-100 text-teal-700' : 'bg-purple-100 text-purple-700';
+                var sourceBadge = '';
+                if (tx.source === 'vault') {
+                    sourceBadge = '<span class="ml-1 text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold shadow-sm">KASA</span>';
+                } else if (tx.source === 'credit') {
+                    var inst = tx.installments || 1;
+                    var instLabel = inst > 1 ? inst + ' taksit' : 'tek çekim';
+                    sourceBadge = '<span class="ml-1 text-[9px] bg-amber-500 text-white px-1.5 py-0.5 rounded font-bold shadow-sm">KK · ' + instLabel + '</span>';
+                }
                 var amountColor = isExpense ? 'text-slate-700' : 'text-emerald-600';
                 var amountPrefix = isExpense ? '-' : '+';
                 var timeStr = tx.time ? tx.time : '';
@@ -568,7 +619,7 @@
                 row.className = "hover:bg-slate-50 transition-colors group";
                 row.innerHTML = '<td class="px-6 py-4 whitespace-nowrap"><div class="text-xs font-semibold text-slate-600 leading-tight">' + dateDisplay + '</div></td>' +
                     '<td class="px-6 py-4"><div class="font-bold text-slate-800 text-[13px] uppercase">' + tx.desc + '</div><div class="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1">' + tx.category + '</div></td>' +
-                    '<td class="px-6 py-4 text-sm"><span class="px-2.5 py-1.5 rounded-lg text-[10px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' + vaultBadge + '</td>' +
+                    '<td class="px-6 py-4 text-sm"><span class="px-2.5 py-1.5 rounded-lg text-[10px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' + sourceBadge + '</td>' +
                     '<td class="px-6 py-4 text-sm font-bold text-right ' + amountColor + '">' + amountPrefix + tx.amount.toLocaleString('tr-TR') + ' ₺</td>' +
                     '<td class="px-4 py-4 text-center whitespace-nowrap"><div class="flex justify-center items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">' +
                     '<button onclick="editTransaction(' + tx.id + ')" class="text-indigo-500 hover:text-indigo-700 p-1.5 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition" title="Düzenle"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>' +
@@ -584,7 +635,7 @@
                     '<div class="font-bold text-slate-800 text-[13px] uppercase truncate">' + tx.desc + '</div>' +
                     '<div class="flex items-center gap-2 mt-1.5 flex-wrap">' +
                     '<span class="text-[10px] text-slate-400 font-semibold">' + dateDisplayMobile + '</span>' +
-                    '<span class="px-2 py-0.5 rounded text-[9px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' + vaultBadge +
+                    '<span class="px-2 py-0.5 rounded text-[9px] tracking-wide font-bold uppercase ' + userBadge + '">' + tx.user + '</span>' + sourceBadge +
                     '<span class="text-[9px] text-slate-300 uppercase tracking-widest font-bold">' + tx.category + '</span>' +
                     '</div></div>' +
                     '<div class="text-right shrink-0">' +
@@ -602,6 +653,7 @@
             var vaultBalance = 0;
             var egemenOutPocket = 0;
             var mesutOutPocket = 0;
+            var halilOutPocket = 0;
             var catTotals = {};
 
             for (var i = 0; i < transactions.length; i++) {
@@ -611,9 +663,12 @@
                     if (!catTotals[tx.category]) catTotals[tx.category] = 0;
                     catTotals[tx.category] += tx.amount;
                     if (tx.source === 'vault') { vaultBalance -= tx.amount; }
-                    else { if (tx.user === 'Egemen') egemenOutPocket += tx.amount; else mesutOutPocket += tx.amount; }
+                    else if (tx.user === 'Egemen') { egemenOutPocket += tx.amount; }
+                    else if (tx.user === 'Halil') { halilOutPocket += tx.amount; }
+                    else { mesutOutPocket += tx.amount; }
                 } else if (tx.type === 'transfer') {
                     if (tx.user === 'Egemen') { egemenOutPocket += tx.amount; mesutOutPocket -= tx.amount; }
+                    else if (tx.user === 'Halil') { halilOutPocket += tx.amount; }
                     else { mesutOutPocket += tx.amount; egemenOutPocket -= tx.amount; }
                 }
             }
@@ -639,10 +694,16 @@
 
             // Partner Stats
             var partnerStats = document.getElementById('partner-stats');
-            var egemenPerc = totalOutPocket > 0 ? (egemenOutPocket / totalOutPocket * 100) : 0;
-            var mesutPerc = totalOutPocket > 0 ? (mesutOutPocket / totalOutPocket * 100) : 0;
-            partnerStats.innerHTML = '<div><div class="flex justify-between text-xs mb-1.5 font-bold"><span class="text-slate-600">Egemen <span class="text-slate-400 font-normal">(Net Katkı)</span></span><span class="text-indigo-600">' + egemenOutPocket.toLocaleString('tr-TR') + ' ₺</span></div><div class="w-full bg-slate-100 rounded-full h-3 mb-5 overflow-hidden shadow-inner"><div class="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + egemenPerc + '%"></div></div></div>' +
+            var totalWithHalil = egemenOutPocket + mesutOutPocket + halilOutPocket;
+            var egemenPerc = totalWithHalil > 0 ? (egemenOutPocket / totalWithHalil * 100) : 0;
+            var mesutPerc = totalWithHalil > 0 ? (mesutOutPocket / totalWithHalil * 100) : 0;
+            var halilPerc = totalWithHalil > 0 ? (halilOutPocket / totalWithHalil * 100) : 0;
+            var partnerHtml = '<div><div class="flex justify-between text-xs mb-1.5 font-bold"><span class="text-slate-600">Egemen <span class="text-slate-400 font-normal">(Net Katkı)</span></span><span class="text-indigo-600">' + egemenOutPocket.toLocaleString('tr-TR') + ' ₺</span></div><div class="w-full bg-slate-100 rounded-full h-3 mb-5 overflow-hidden shadow-inner"><div class="bg-indigo-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + egemenPerc + '%"></div></div></div>' +
                 '<div><div class="flex justify-between text-xs mb-1.5 font-bold"><span class="text-slate-600">Mesut <span class="text-slate-400 font-normal">(Net Katkı)</span></span><span class="text-purple-600">' + mesutOutPocket.toLocaleString('tr-TR') + ' ₺</span></div><div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner"><div class="bg-purple-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + mesutPerc + '%"></div></div></div>';
+            if (halilOutPocket > 0) {
+                partnerHtml += '<div class="mt-5"><div class="flex justify-between text-xs mb-1.5 font-bold"><span class="text-slate-600">Halil <span class="text-slate-400 font-normal">(Net Katkı)</span></span><span class="text-teal-600">' + halilOutPocket.toLocaleString('tr-TR') + ' ₺</span></div><div class="w-full bg-slate-100 rounded-full h-3 overflow-hidden shadow-inner"><div class="bg-teal-500 h-full rounded-full transition-all duration-1000 ease-out" style="width: ' + halilPerc + '%"></div></div></div>';
+            }
+            partnerStats.innerHTML = partnerHtml;
 
             // Category Breakdown
             var breakdownEl = document.getElementById('category-breakdown');
@@ -702,7 +763,8 @@
         /* ========== Login Logic ========== */
         const users = {
             "mesut": "2025",
-            "egemen": "2025"
+            "egemen": "2025",
+            "halil": "2025"
         };
 
         function checkLogin() {
@@ -762,6 +824,152 @@
             initApp();
         }
 
+        /* ========== Kredi Kartı / Taksit UI ========== */
+        function resetInstallmentUI() {
+            var ig = document.getElementById('installment-group');
+            var tcg = document.getElementById('taksit-count-group');
+            if (ig) ig.classList.add('hidden');
+            if (tcg) tcg.classList.add('hidden');
+            var btnTek = document.getElementById('btn-tek');
+            var btnTaksit = document.getElementById('btn-taksit');
+            if (btnTek) btnTek.className = 'flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition bg-amber-500 text-white border-amber-500';
+            if (btnTaksit) btnTaksit.className = 'flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition bg-white text-slate-500 border-slate-300';
+        }
+
+        window.handleSourceChange = function() {
+            var source = document.getElementById('form-source').value;
+            var ig = document.getElementById('installment-group');
+            if (source === 'credit') {
+                ig.classList.remove('hidden');
+                setInstallmentType('tek');
+            } else {
+                ig.classList.add('hidden');
+            }
+        };
+
+        window.setInstallmentType = function(type) {
+            var tcg = document.getElementById('taksit-count-group');
+            var btnTek = document.getElementById('btn-tek');
+            var btnTaksit = document.getElementById('btn-taksit');
+            if (type === 'tek') {
+                if (tcg) tcg.classList.add('hidden');
+                if (btnTek) btnTek.className = 'flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition bg-amber-500 text-white border-amber-500';
+                if (btnTaksit) btnTaksit.className = 'flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition bg-white text-slate-500 border-slate-300';
+            } else {
+                if (tcg) tcg.classList.remove('hidden');
+                if (btnTaksit) btnTaksit.className = 'flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition bg-amber-500 text-white border-amber-500';
+                if (btnTek) btnTek.className = 'flex-1 py-2.5 rounded-xl border-2 text-sm font-bold transition bg-white text-slate-500 border-slate-300';
+            }
+        };
+
+        /* ========== Taksit Takvimi ========== */
+        function renderInstallmentCalendar() {
+            var calEl = document.getElementById('installment-calendar');
+            if (!calEl) return;
+
+            var creditTxs = [];
+            for (var i = 0; i < transactions.length; i++) {
+                if (transactions[i].source === 'credit' && transactions[i].type === 'expense') {
+                    creditTxs.push(transactions[i]);
+                }
+            }
+
+            if (creditTxs.length === 0) {
+                calEl.innerHTML = '<p class="text-sm text-slate-400 italic text-center py-2">Kredi kartı işlemi bulunmuyor.</p>';
+                return;
+            }
+
+            // Aylık takvim oluştur
+            var schedule = {};
+            var totalDebt = 0;
+
+            for (var i = 0; i < creditTxs.length; i++) {
+                var tx = creditTxs[i];
+                var inst = tx.installments || 1;
+                var monthlyAmt = tx.amount / inst;
+                totalDebt += tx.amount;
+                var parts = tx.date.split('-');
+                var baseYear = parseInt(parts[0]);
+                var baseMonth = parseInt(parts[1]) - 1;
+                for (var j = 0; j < inst; j++) {
+                    var d = new Date(baseYear, baseMonth + j, 1);
+                    var ym = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+                    if (!schedule[ym]) schedule[ym] = [];
+                    schedule[ym].push({ desc: tx.desc, amount: monthlyAmt, user: tx.user, instNum: j + 1, instTotal: inst });
+                }
+            }
+
+            var trMonths = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+            var today = new Date();
+            var currentYM = today.getFullYear() + '-' + ('0' + (today.getMonth() + 1)).slice(-2);
+
+            // Kalan borç hesapla
+            var sortedMonths = Object.keys(schedule).sort();
+            var remainingDebt = 0;
+            for (var m = 0; m < sortedMonths.length; m++) {
+                if (sortedMonths[m] >= currentYM) {
+                    for (var k = 0; k < schedule[sortedMonths[m]].length; k++) {
+                        remainingDebt += schedule[sortedMonths[m]][k].amount;
+                    }
+                }
+            }
+
+            var html = '<div class="mb-3 p-3 bg-amber-50 rounded-xl border border-amber-100">' +
+                '<div class="flex justify-between items-center"><span class="text-xs font-semibold text-amber-700">Toplam KK Harcaması</span>' +
+                '<span class="text-sm font-bold text-amber-700">' + totalDebt.toLocaleString('tr-TR', {maximumFractionDigits: 0}) + ' ₺</span></div>';
+            if (remainingDebt > 0 && remainingDebt < totalDebt) {
+                html += '<div class="flex justify-between items-center mt-1"><span class="text-[10px] text-amber-500">Kalan Ödenecek</span>' +
+                    '<span class="text-xs font-bold text-amber-600">' + remainingDebt.toLocaleString('tr-TR', {maximumFractionDigits: 0}) + ' ₺</span></div>';
+            }
+            html += '</div>';
+
+            for (var m = 0; m < sortedMonths.length; m++) {
+                var ym = sortedMonths[m];
+                var items = schedule[ym];
+                var monthTotal = 0;
+                for (var k = 0; k < items.length; k++) monthTotal += items[k].amount;
+                var ymParts = ym.split('-');
+                var monthLabel = trMonths[parseInt(ymParts[1]) - 1] + ' ' + ymParts[0];
+                var isPast = ym < currentYM;
+                var isCurrent = ym === currentYM;
+                var safeId = 'inst_' + ym.replace('-', '_');
+
+                html += '<div class="border border-slate-100 rounded-xl overflow-hidden mb-2">' +
+                    '<div class="flex justify-between items-center px-3 py-2.5 cursor-pointer select-none ' + (isPast ? 'bg-slate-50' : isCurrent ? 'bg-amber-50' : 'bg-white') + '" onclick="toggleInstMonth(\'' + safeId + '\')">' +
+                    '<div class="flex items-center gap-2">' +
+                    (isPast ? '<span class="text-[8px] font-bold bg-slate-200 text-slate-400 px-1.5 py-0.5 rounded uppercase">Geçti</span>' : '') +
+                    (isCurrent ? '<span class="text-[8px] font-bold bg-amber-400 text-white px-1.5 py-0.5 rounded uppercase">Bu Ay</span>' : '') +
+                    '<span class="text-xs font-bold ' + (isPast ? 'text-slate-400' : 'text-slate-700') + '">' + monthLabel + '</span></div>' +
+                    '<div class="flex items-center gap-2">' +
+                    '<span class="text-xs font-bold ' + (isPast ? 'line-through text-slate-300' : 'text-amber-600') + '">' + monthTotal.toLocaleString('tr-TR', {maximumFractionDigits: 0}) + ' ₺</span>' +
+                    '<svg id="chv-' + safeId + '" class="w-3.5 h-3.5 text-slate-400 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg></div></div>' +
+                    '<div id="' + safeId + '" class="hidden divide-y divide-slate-50">';
+
+                for (var k = 0; k < items.length; k++) {
+                    var item = items[k];
+                    var uc = item.user === 'Egemen' ? 'text-indigo-600' : item.user === 'Halil' ? 'text-teal-600' : 'text-purple-600';
+                    var instInfo = item.instTotal > 1 ? (item.instNum + '/' + item.instTotal + ' taksit') : 'tek çekim';
+                    html += '<div class="flex justify-between items-center px-3 py-2 bg-white">' +
+                        '<div><div class="text-[11px] font-semibold text-slate-700">' + item.desc + '</div>' +
+                        '<div class="text-[9px] text-slate-400 mt-0.5"><span class="' + uc + ' font-bold">' + item.user + '</span> · ' + instInfo + '</div></div>' +
+                        '<span class="text-xs font-bold text-slate-600">' + item.amount.toLocaleString('tr-TR', {maximumFractionDigits: 0}) + ' ₺</span></div>';
+                }
+                html += '</div></div>';
+            }
+
+            calEl.innerHTML = html;
+        }
+
+        window.toggleInstMonth = function(id) {
+            var el = document.getElementById(id);
+            var chv = document.getElementById('chv-' + id);
+            if (el) {
+                var isHidden = el.classList.contains('hidden');
+                el.classList.toggle('hidden');
+                if (chv) chv.style.transform = isHidden ? 'rotate(90deg)' : '';
+            }
+        };
+
         // Init
         checkLogin();
 
@@ -802,11 +1010,25 @@
                         }
                         document.getElementById('form-category').value = tx.category;
                         document.getElementById('form-source').value = tx.source;
+                        // Kredi kartı taksit alanlarını geri yükle
+                        if (tx.source === 'credit') {
+                            document.getElementById('installment-group').classList.remove('hidden');
+                            var inst = tx.installments || 1;
+                            if (inst > 1) {
+                                setInstallmentType('taksit');
+                                document.getElementById('form-installments').value = String(inst);
+                            } else {
+                                setInstallmentType('tek');
+                            }
+                        } else {
+                            resetInstallmentUI();
+                        }
                     }
                 }
             } else {
                 document.getElementById('transaction-form').reset();
                 document.getElementById('form-type').value = type;
+                resetInstallmentUI();
             }
             setTimeout(function() { document.getElementById('form-desc').focus(); }, 100);
         };
@@ -814,6 +1036,7 @@
         window.closeModal = function() {
             document.getElementById('modal-overlay').classList.add('hidden');
             document.getElementById('transaction-form').reset();
+            resetInstallmentUI();
         };
     </script>
 </body>
