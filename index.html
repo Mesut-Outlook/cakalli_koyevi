@@ -208,7 +208,7 @@
                 <div class="space-y-5">
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1">İşlemi Yapan Kişi</label>
-                        <select id="form-user" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition" required>
+                        <select id="form-user" onchange="if(document.getElementById('form-payment-type') && document.getElementById('form-payment-type').value==='credit_payment' && document.getElementById('form-credit-tx').value) handleCreditTxChange();" class="w-full p-3 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 transition" required>
                             <option value="Egemen">Egemen</option>
                             <option value="Mesut">Mesut</option>
                             <option value="Halil">Halil</option>
@@ -766,6 +766,17 @@
             return null;
         }
 
+        // Bir KK işlemi için taksit ödemesi yapması gereken kişiler (CC sahibi hariç M-E)
+        // - Halil KK → [Mesut, Egemen] her ikisi de aylık tutarın YARISINI Halil'e öder
+        // - Mesut KK → [Egemen] aylık tutarın yarısını Mesut'a öder
+        // - Egemen KK → [Mesut] aylık tutarın yarısını Egemen'e öder
+        function getRequiredPayers(ccOwner) {
+            if (ccOwner === 'Halil') return ['Mesut', 'Egemen'];
+            if (ccOwner === 'Mesut') return ['Egemen'];
+            if (ccOwner === 'Egemen') return ['Mesut'];
+            return [];
+        }
+
         function renderStats() {
             var totalSpent = 0;
             var vaultBalance = 0;
@@ -1043,13 +1054,14 @@
             var schedule = {};
             var totalDebt = 0;
 
-            // Ödenmiş taksitleri tespit et: { creditTxId: { instNum: true } }
+            // Ödenmiş taksitleri tespit et: { creditTxId: { instNum: { Mesut: true, Egemen: true } } }
             var paidMap = {};
             for (var pi = 0; pi < transactions.length; pi++) {
                 var pt = transactions[pi];
                 if (pt.type === 'transfer' && pt.paymentType === 'credit_payment' && pt.relatedCreditTxId && pt.installmentNumber) {
                     if (!paidMap[pt.relatedCreditTxId]) paidMap[pt.relatedCreditTxId] = {};
-                    paidMap[pt.relatedCreditTxId][pt.installmentNumber] = true;
+                    if (!paidMap[pt.relatedCreditTxId][pt.installmentNumber]) paidMap[pt.relatedCreditTxId][pt.installmentNumber] = {};
+                    paidMap[pt.relatedCreditTxId][pt.installmentNumber][pt.user] = true;
                 }
             }
 
@@ -1057,6 +1069,7 @@
                 var tx = creditTxs[i];
                 var inst = tx.installments || 1;
                 var monthlyAmt = tx.amount / inst;
+                var reqPayers = getRequiredPayers(tx.user);
                 totalDebt += tx.amount;
                 var parts = tx.date.split('-');
                 var baseYear = parseInt(parts[0]);
@@ -1065,8 +1078,19 @@
                     var d = new Date(baseYear, baseMonth + j, 1);
                     var ym = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
                     if (!schedule[ym]) schedule[ym] = [];
-                    var isPaid = !!(paidMap[tx.id] && paidMap[tx.id][j + 1]);
-                    schedule[ym].push({ desc: tx.desc, amount: monthlyAmt, user: tx.user, instNum: j + 1, instTotal: inst, paid: isPaid });
+                    var payers = (paidMap[tx.id] && paidMap[tx.id][j + 1]) || {};
+                    var paidPayers = [];
+                    for (var rpi = 0; rpi < reqPayers.length; rpi++) {
+                        if (payers[reqPayers[rpi]]) paidPayers.push(reqPayers[rpi]);
+                    }
+                    var fullyPaid = reqPayers.length > 0 && paidPayers.length === reqPayers.length;
+                    var partiallyPaid = paidPayers.length > 0 && !fullyPaid;
+                    schedule[ym].push({
+                        desc: tx.desc, amount: monthlyAmt, user: tx.user,
+                        instNum: j + 1, instTotal: inst,
+                        paid: fullyPaid, partiallyPaid: partiallyPaid,
+                        paidPayers: paidPayers, reqPayers: reqPayers
+                    });
                 }
             }
 
@@ -1074,15 +1098,17 @@
             var today = new Date();
             var currentYM = today.getFullYear() + '-' + ('0' + (today.getMonth() + 1)).slice(-2);
 
-            // Borç durumu: ödenmiş + ödenmemiş toplamlar
+            // Borç durumu: ödenmiş + ödenmemiş toplamlar (orantısal — kısmi ödemeleri de say)
             var sortedMonths = Object.keys(schedule).sort();
             var paidTotal = 0;
             var unpaidTotal = 0;
             for (var m = 0; m < sortedMonths.length; m++) {
                 for (var k = 0; k < schedule[sortedMonths[m]].length; k++) {
                     var it = schedule[sortedMonths[m]][k];
-                    if (it.paid) paidTotal += it.amount;
-                    else unpaidTotal += it.amount;
+                    var reqCount = it.reqPayers.length || 1;
+                    var paidPortion = it.paidPayers.length / reqCount;
+                    paidTotal += it.amount * paidPortion;
+                    unpaidTotal += it.amount * (1 - paidPortion);
                 }
             }
 
@@ -1125,11 +1151,26 @@
                     var item = items[k];
                     var uc = item.user === 'Egemen' ? 'text-indigo-600' : item.user === 'Halil' ? 'text-teal-600' : 'text-purple-600';
                     var instInfo = item.instTotal > 1 ? (item.instNum + '/' + item.instTotal + ' taksit') : 'tek çekim';
-                    var paidIcon = item.paid ? '<span class="text-emerald-600 font-bold text-[10px] mr-1">✓</span>' : '';
-                    var amtClass = item.paid ? 'text-emerald-600 line-through' : 'text-slate-600';
-                    html += '<div class="flex justify-between items-center px-3 py-2 ' + (item.paid ? 'bg-emerald-50' : 'bg-white') + '">' +
+                    var rowBg, paidIcon, amtClass, statusBadge;
+                    if (item.paid) {
+                        rowBg = 'bg-emerald-50';
+                        paidIcon = '<span class="text-emerald-600 font-bold text-[10px] mr-1">✓</span>';
+                        amtClass = 'text-emerald-600 line-through';
+                        statusBadge = ' · <span class="text-emerald-600 font-bold">TAMAMI ÖDENDİ</span>';
+                    } else if (item.partiallyPaid) {
+                        rowBg = 'bg-amber-50/40';
+                        paidIcon = '<span class="text-amber-600 font-bold text-[10px] mr-1">⏳</span>';
+                        amtClass = 'text-amber-700';
+                        statusBadge = ' · <span class="text-amber-600 font-bold">' + item.paidPayers.join(', ') + ' ödedi</span>';
+                    } else {
+                        rowBg = 'bg-white';
+                        paidIcon = '';
+                        amtClass = 'text-slate-600';
+                        statusBadge = '';
+                    }
+                    html += '<div class="flex justify-between items-center px-3 py-2 ' + rowBg + '">' +
                         '<div><div class="text-[11px] font-semibold text-slate-700">' + paidIcon + item.desc + '</div>' +
-                        '<div class="text-[9px] text-slate-400 mt-0.5"><span class="' + uc + ' font-bold">' + item.user + '</span> · ' + instInfo + (item.paid ? ' · <span class="text-emerald-600 font-bold">ÖDENDİ</span>' : '') + '</div></div>' +
+                        '<div class="text-[9px] text-slate-400 mt-0.5"><span class="' + uc + ' font-bold">' + item.user + '</span> · ' + instInfo + statusBadge + '</div></div>' +
                         '<span class="text-xs font-bold ' + amtClass + '">' + item.amount.toLocaleString('tr-TR', {maximumFractionDigits: 0}) + ' ₺</span></div>';
                 }
                 html += '</div></div>';
@@ -1261,29 +1302,53 @@
             if (!ccTx) { isg.classList.add('hidden'); return; }
             var instTotal = ccTx.installments || 1;
             var monthlyAmt = ccTx.amount / instTotal;
-            // Hangi taksitler ödenmiş?
-            var paidSet = {};
+            // Her ödeyici aylık tutarın YARISINI öder (M-E 50/50 paylaşımı)
+            var perPersonAmt = monthlyAmt / 2;
+            var requiredPayers = getRequiredPayers(ccTx.user);
+            var currentUser = document.getElementById('form-user').value;
+
+            // Per-user paid map: { instNum: { Mesut: true, Egemen: true } }
+            var paidByUser = {};
             for (var j = 0; j < transactions.length; j++) {
                 var t = transactions[j];
                 if (t.type === 'transfer' && t.paymentType === 'credit_payment' && t.relatedCreditTxId === ccId && t.installmentNumber) {
-                    paidSet[t.installmentNumber] = true;
+                    if (!paidByUser[t.installmentNumber]) paidByUser[t.installmentNumber] = {};
+                    paidByUser[t.installmentNumber][t.user] = true;
                 }
             }
             var html = '';
             for (var n = 1; n <= instTotal; n++) {
-                var paid = paidSet[n] ? ' ✓ ÖDENDİ' : '';
-                html += '<option value="' + n + '"' + (paidSet[n] ? ' disabled' : '') + '>' + n + '/' + instTotal + ' (' + Math.round(monthlyAmt).toLocaleString('tr-TR') + ' ₺)' + paid + '</option>';
+                var payers = paidByUser[n] || {};
+                var paidByCurrent = !!payers[currentUser];
+                var fullyPaid = requiredPayers.length > 0 && requiredPayers.every(function(u) { return payers[u]; });
+                var label = n + '/' + instTotal + ' (' + Math.round(perPersonAmt).toLocaleString('tr-TR') + ' ₺)';
+                if (fullyPaid) {
+                    label += ' ✓ TAMAMI ÖDENDİ';
+                } else if (paidByCurrent) {
+                    label += ' — Siz ödediniz';
+                } else {
+                    var otherPaid = [];
+                    for (var rpIdx = 0; rpIdx < requiredPayers.length; rpIdx++) {
+                        var rp = requiredPayers[rpIdx];
+                        if (rp !== currentUser && payers[rp]) otherPaid.push(rp);
+                    }
+                    if (otherPaid.length > 0) {
+                        label += ' — ' + otherPaid.join(', ') + ' ödedi (sıra sizde)';
+                    }
+                }
+                html += '<option value="' + n + '"' + (paidByCurrent ? ' disabled' : '') + '>' + label + '</option>';
             }
             instSel.innerHTML = html;
-            // İlk ödenmemiş taksiti otomatik seç
+            // İlk, current user'ın ödemediği taksiti otomatik seç
             for (var n2 = 1; n2 <= instTotal; n2++) {
-                if (!paidSet[n2]) { instSel.value = String(n2); break; }
+                var p2 = paidByUser[n2] || {};
+                if (!p2[currentUser]) { instSel.value = String(n2); break; }
             }
             isg.classList.remove('hidden');
-            // Tutar alanını otomatik doldur (boşsa)
+            // Tutar alanını yarı aylık olarak doldur (boşsa)
             var amtInput = document.getElementById('form-amount');
             if (!amtInput.value || parseFloat(amtInput.value) === 0) {
-                amtInput.value = monthlyAmt.toFixed(2);
+                amtInput.value = perPersonAmt.toFixed(2);
             }
         };
 
