@@ -53,19 +53,30 @@ Kod: satır ~764 (`const users = { ... }`)
 
 ```js
 {
+  // Ortak alanlar
   id: Date.now(),           // unique ID (epoch ms)
   date: "2026-05-14",       // ISO tarih (string)
-  time: "14:32",            // HH:MM (sadece yeni kayıtlarda, eskiler boş)
+  time: "14:32",            // HH:MM (sadece yeni kayıtlarda)
   type: "expense" | "transfer",
   user: "Mesut" | "Egemen" | "Halil",
-  amount: 15000,            // sayı (TL)
-  desc: "AÇIKLAMA",         // uppercase gösteriliyor
+  amount: 15000,            // TOPLAM tutar (taksitli ise full)
+  desc: "AÇIKLAMA",
   category: "Fidan/Ağaç",  // expense için; transfer → "Nakit Ödeme"
+  createdAt: 1234567890123,
+
+  // Expense alanları
   source: "personal" | "vault" | "credit",
-  installments: 1,          // credit ise: 1=tek çekim, 2-24=taksit sayısı
-  createdAt: 1234567890123  // epoch ms (sıralama için)
+  installments: 1,          // credit ise: 1=tek çekim, 2-60=taksit sayısı
+
+  // Transfer alanları (sadece type='transfer' ise)
+  paymentType: "cash" | "credit_payment",  // KK taksit ödemesi mi
+  recipient: "Mesut" | "Egemen" | "Halil",  // alıcı
+  relatedCreditTxId: 12345,  // credit_payment ise hangi KK işlemi
+  installmentNumber: 3       // credit_payment ise kaçıncı taksit
 }
 ```
+
+**Önemli**: KK işlemlerinde `tx.amount` TOPLAM tutardır. Aylık taksit = `amount / installments`.
 
 **source değerleri:**
 - `personal` → Kendi cebinden
@@ -126,14 +137,16 @@ transactions.sort(function(a, b) {
 ```
 Aynı tarihte birden fazla kayıt varsa `createdAt` ile sıralanır (son girilen üstte).
 
-## Dengeleme (Settlement) Mantığı
+## Dengeleme (Settlement) Mantığı — 3-yönlü, M-E 50/50
 
-- **Sadece Mesut–Egemen** arasında 50/50 paylaşım
-- `vault` harcamaları → kasa bakiyesinden düşülür, kişi katkısına dahil edilmez
-- `personal` harcama → ilgili kişinin cebinden sayılır
-- `credit` harcama → `personal` gibi kişinin cebinden sayılır (taksit takviminde ayrıca gösterilir)
-- `transfer` → ödeyen kişinin katkısını artırır, alacaklının katkısını azaltır
-- **Halil'in harcamaları** → `halilOutPocket` ayrı tutulur, Mesut-Egemen dengelemesine dahil edilmez; "Ortak Net Katkı Oranları" panelinde gösterilir (katkısı varsa)
+- **TÜM** harcamalar (vault hariç, personal+credit dahil) → M ve E arası 50/50 bölünür
+- Halil ödese bile paylaşım M-E olur: M ve E her biri Halil'e ödediği tutarın yarısını borçludur
+- `vault` harcamaları → kasa bakiyesinden düşülür, dengelemeye dahil DEĞİL
+- `transfer` → gönderenin net katkısı artar, alıcının azalır
+
+**Algoritma** (minimum transfer): Creditors ve debtors sıralı listede eşleştirilir, en büyük borçlu en büyük alacaklıya min(borç,alacak) öder. Çoklu mesaj UI'da satır satır gösterilir.
+
+**Eski transfer verisi** için `recipient` yoksa: M↔E inference (M→E, E→M).
 
 ## Taksit Takvimi Paneli
 
@@ -156,6 +169,16 @@ Aynı tarihte birden fazla kayıt varsa `createdAt` ile sıralanır (son girilen
 
 ## Son Değişiklikler (2026-05-14)
 
+### Bugün:
+- 3-yönlü dengeleme algoritması (minimum transfer)
+- KK Taksit Ödemesi: transfer modal'da yeni mod
+- Ödenmiş taksit takibi (✓ yeşil tik, üstü çizili)
+- Taksit sayısı serbest input (2-60), select değil
+- Transfer modal'a "Kime?" alanı eklendi
+- Yedek İndir / Geri Yükle JSON butonları (header)
+- Settlement card çoklu mesaj destekliyor (`<div>` + multiple lines)
+
+### Önceki:
 - `installments` alanı eklendi (kredi kartı taksit)
 - `source: 'credit'` ödeme kaynağı eklendi
 - Halil kullanıcısı eklendi (login + form + teal badge)
